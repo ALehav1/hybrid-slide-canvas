@@ -1,0 +1,1532 @@
+/* ========== GLOBAL STYLES ========== */
+:root {
+  /* Color Palette */
+  --color-primary: #007acc; /* Updated to match user's preferred blue */
+  --color-primary-hover: #0066aa;
+  --color-primary-light: #dbeafe;
+  --color-secondary: #475569;
+  --color-secondary-hover: #334155;
+  --color-tertiary: #10b981;
+  --color-background: #ffffff;
+  --color-surface: #f8fafc;
+  --color-surface-hover: #e2e8f0;
+  --color-ui-background-alt: #f0f0f0;
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  --color-border: #e2e8f0;
+  --color-disabled: #cbd5e1;
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-success: #4CAF50;
+  --color-success-light: #e8f5e9;
+  
+  /* Advanced Color Palette */
+  --color-blue: #007acc;
+  --color-red: #e53e3e;
+  --color-green: #10b981;
+  --color-yellow: #f59e0b;
+  --color-purple: #8b5cf6;
+  --color-orange: #f97316;
+  --color-black: #111827;
+  --color-white: #ffffff;
+  --color-grey: #6b7280;
+
+  /* Color scheme variables */
+  --color-primary-dark: #0056b3;
+  --color-danger: #dc3545;
+  --color-surface-light: #f8f9fa;
+  --color-text: #212529;
+  --color-text-muted: #6c757d;
+  --color-text-strong: #333333;
+  --color-text-soft: #666666;
+  --color-icon-light: #cccccc;
+
+  /* Typography */
+  --font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-xxl: 24px;
+  --font-size-xxxl: 28px;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-10px: 10px;
+  --spacing-12px: 12px;
+  --spacing-15px: 15px;
+  --spacing-md: 16px;
+  --spacing-20px: 20px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 10px 40px rgba(0,0,0,0.2);
+  --shadow-hover-lift: 0 4px 12px rgba(0,0,0,0.1);
+
+  /* Animation */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s ease;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Layout Heights */
+  --top-nav-height: 60px;
+  --chat-panel-expanded-height: 380px;
+  --chat-panel-collapsed-height: 60px;
+  --chat-panel-expanded-height-mobile: 320px;
+}
+
+/* Base Styles */
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-primary);
+  font-size: var(--font-size-md);
+  color: var(--color-secondary);
+  background-color: var(--color-background);
+  line-height: 1.5;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+/* ========== NEW LAYOUT STRUCTURE ========== */
+
+/* Main layout container with a fixed layout structure */
+.hybrid-app-layout {
+  display: grid;
+  grid-template-rows: var(--top-nav-height) 1fr; /* Top nav, Main content only - removed auto */
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  /* position: fixed; top: 0; left: 0; Removed as grid should manage viewport */
+}
+
+/* Top navigation bar */
+.top-nav {
+  grid-row: 1;
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--spacing-xs) var(--spacing-md);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: var(--shadow-sm);
+  height: 60px;
+}
+
+/* Slide jump container */
+.slide-jump-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.slide-jump-container:hover {
+  background: var(--color-primary-light);
+}
+
+/* Top actions */
+.top-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.top-actions button {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.top-actions button:hover {
+  background: var(--color-primary-light);
+}
+
+/* Improved top navigation layout */
+.top-nav-improved {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  height: 60px;
+}
+
+.top-nav-improved .slide-controls {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.top-nav-improved .top-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Main content area containing the canvas */
+.main-content {
+  grid-row: 2;
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  overflow: hidden;
+  transition: height var(--transition-normal);
+}
+
+/* Canvas wrapper constrains the TLDraw canvas */
+.canvas-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Bottom control panel */
+.bottom-panel {
+  grid-row: 3;
+  background: var(--color-background);
+  border-top: 1px solid var(--color-border);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  z-index: 100;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  overflow-y: auto; /* Allow scrolling if content is too tall */
+}
+
+.bottom-panel.chat-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 50px);
+  background-color: var(--color-background-light);
+}
+
+.panel.right .content .conversation-history {
+  /* Overrides for .conversation-history within .panel.right .content */
+  padding: var(--spacing-lg); /* Override base padding */
+  background-color: var(--color-background-light); /* Override base background */
+  border: none; /* Remove all borders from base style */
+  border-bottom: 1px solid var(--color-border); /* Add only bottom border */
+  border-radius: 0; /* Remove base border-radius */
+}
+
+/* TLDraw component styling */
+.tldraw {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+/* Simple style for frame labels to make them subtle but not break functionality */
+.tl-frame-label {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+/* Also hide frame heading for extra safety */
+.tl-frame-heading {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+
+/* Ensure TLDraw editor takes full space and doesn't interfere with our UI */
+.tldraw__editor {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: 1; /* Ensure it's above background elements but below UI overlays */
+}
+
+/* Hide TLDraw's default UI elements (top bar, bottom bar) */
+.tlui-layout__top,
+.tlui-layout__bottom {
+  display: none !important;
+}
+
+/* TLDraw UI customization using hideUi prop approach */
+
+/* Style for the tools toggle button */
+.sidebar-toggle {
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  padding: 8px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  border: none;
+  transition: all 0.2s ease;
+  margin-right: 10px;
+}
+
+/* When tools are hidden, maximize canvas area */
+.tools-hidden {
+  width: 100%;
+  height: 100%;
+}
+
+/* Properly style the TLDraw UI when tools are visible */
+.tools-visible .tldraw {
+  width: 100%;
+  height: 100%;
+}
+
+/* Make sure UI is properly styled */
+.tldraw {
+  --tl-zoom: visible !important;
+  --tl-menu: visible !important;
+}
+
+/* Button hover effects */
+.sidebar-toggle:hover {
+  background-color: var(--color-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+}
+
+.sidebar-toggle:active {
+  transform: translateY(0px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+/* Animation to draw attention to the button */
+@keyframes pulse-attention {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.sidebar-toggle:hover {
+  background: var(--color-primary-hover);
+}
+
+/* When the sidebar is open */
+.tldraw-sidebar-open .tldraw {
+  --tldraw-sidebar-width: 240px; /* Width when open */
+}
+
+/* Debug indicator to verify UI is rendering */
+.debug-indicator {
+  position: fixed;
+  top: 5px;
+  right: 5px;
+  background: #ff3b30;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 9999;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Advanced shape styling */
+.tl-shape[data-type="geo"] {
+  transition: all 0.3s ease;
+}
+
+.tl-shape[data-type="geo"]:hover {
+  filter: brightness(1.05);
+}
+
+/* Customize TLDraw toolbar appearance */
+.tldraw__editor-tools {
+  background-color: var(--color-surface) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+/* Improve frame appearance */
+.tl-shape[data-type="frame"] {
+  border-color: var(--color-border) !important;
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* ========== CONTROLS STYLES ========== */
+
+/* Slide controls are now part of the top navigation */
+.slide-controls {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  height: 100%;
+}
+
+.navigation-button {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.navigation-button:hover:not(:disabled) {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.navigation-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.slide-counter {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.action-button {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.action-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.action-button:disabled {
+  background: var(--color-disabled);
+  cursor: not-allowed;
+}
+
+/* ========== PROMPT INTERFACE STYLES ========== */
+
+/* Prompt container is now part of the bottom panel */
+.prompt-container {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+  width: 100%;
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.prompt-input {
+  flex: 1;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.prompt-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.generate-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.generate-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.generate-button:disabled {
+  background: var(--color-disabled);
+  cursor: not-allowed;
+}
+
+/* ========== ERROR DISPLAY STYLES ========== */
+
+/* Error message is now part of the bottom panel */
+.error-message {
+  background: var(--color-error-light);
+  color: var(--color-error);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  width: 100%;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  animation: fadeIn var(--transition-normal);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* ========== TIPS STYLES ========== */
+
+/* Tips container is now part of the bottom panel */
+.tips-container {
+  padding: var(--spacing-sm);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  border: 1px solid var(--color-border);
+  color: var(--color-secondary);
+  margin-bottom: var(--spacing-md); /* Extra space at the bottom */
+  max-height: 120px; /* Limit height and add scrolling if needed */
+  overflow-y: auto;
+}
+
+.tips-header {
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+}
+
+.tips-list {
+  margin-top: var(--spacing-xs);
+}
+
+/* ========== ANIMATIONS ========== */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
+/* Squiggly line animation */
+@keyframes squiggle {
+  0% { transform: translateY(0); }
+  25% { transform: translateY(3px); }
+  50% { transform: translateY(0); }
+  75% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
+}
+
+/* Highlight animation */
+@keyframes highlight-pulse {
+  0% { background-color: rgba(255, 255, 0, 0.2); }
+  50% { background-color: rgba(255, 255, 0, 0.4); }
+  100% { background-color: rgba(255, 255, 0, 0.2); }
+}
+
+/* Underline animation */
+@keyframes underline-pulse {
+  0% { border-bottom-width: 1px; }
+  50% { border-bottom-width: 3px; }
+  100% { border-bottom-width: 1px; }
+}
+
+/* Animation classes for shapes */
+.rotate-slow {
+  animation: rotate 10s linear infinite;
+}
+
+.rotate-medium {
+  animation: rotate 5s linear infinite;
+}
+
+/* Special effect classes */
+.effect-squiggle {
+  animation: squiggle 0.5s ease-in-out infinite;
+  border: 2px dashed;
+}
+
+.effect-highlight {
+  animation: highlight-pulse 2s ease-in-out infinite;
+  background-color: rgba(255, 255, 0, 0.2);
+}
+
+.effect-underline {
+  animation: underline-pulse 2s ease-in-out infinite;
+  border-bottom: 2px solid;
+}
+
+.rotate-fast {
+  animation: rotate 2s linear infinite;
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ========== RESPONSIVE STYLES ========== */
+
+@media (max-width: 768px) {
+  /* Adjust grid layout for smaller screens */
+  .hybrid-app-layout {
+    grid-template-rows: 60px 1fr; /* Taller bottom panel on mobile */
+  }
+  
+  /* Make sure controls fit on smaller screens */
+  .slide-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  /* Stack prompt input and button on smaller screens */
+  .prompt-container {
+    flex-direction: column;
+  }
+  
+  .prompt-input,
+  .generate-button {
+    width: 100%;
+  }
+}
+
+/* Add more responsive breakpoints as needed */
+
+/* Dialog styles */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.dialog-container {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dialog-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+.dialog-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.dialog-close:hover {
+  color: var(--color-danger);
+}
+
+.dialog-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow: hidden;
+}
+
+/* Suspect .conversation-history rule (around line 704) removed */
+
+.message {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-background);
+}
+
+.message-user {
+  background: var(--color-primary);
+  color: white;
+  margin-left: 20%;
+}
+
+.message-assistant {
+  background: var(--color-surface-light);
+  margin-right: 20%;
+}
+
+/* Dialog responsive improvements */
+@media (max-width: 768px) {
+  .dialog-container {
+    width: 95%;
+    height: 90%;
+    max-height: none;
+  }
+}
+
+/* Dialog responsive improvements */
+@media (max-width: 768px) {
+  .dialog-container {
+    width: 95%;
+    height: 90%;
+    max-height: none;
+  }
+}
+
+/* Conversation management styles */
+.dialog-title-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+}
+
+.conversation-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.clear-conversation-btn {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.clear-conversation-btn:hover {
+  background: var(--color-error-light);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Consolidated base style for conversation history areas */
+.conversation-history {
+  flex: 1; /* Allow it to take available space in a flex container */
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md); /* Space between messages */
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background); /* Default from chat interface context */
+  scroll-behavior: smooth;
+  /* max-height and margin-bottom will be handled contextually if needed */
+}
+
+/* Unified scrollbar styling for conversation history */
+.conversation-history::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversation-history::-webkit-scrollbar-track {
+  background: var(--color-surface); /* Common track color */
+  border-radius: 3px; /* Consistent radius */
+}
+
+.conversation-history::-webkit-scrollbar-thumb {
+  background: var(--color-border); /* Common thumb color */
+  border-radius: 3px; /* Consistent radius */
+}
+
+.conversation-history::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted); /* Common hover color */
+}
+
+/* Message styling improvements */
+.message {
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-error);
+  margin: var(--spacing-sm) 0;
+}
+
+/* Slide Navigator styles */
+.slide-navigator-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.slide-navigator {
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.navigator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.navigator-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+.navigator-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.navigator-close:hover {
+  color: var(--color-danger);
+}
+
+.slides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.slide-thumbnail {
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  position: relative;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.slide-thumbnail:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.slide-thumbnail.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.slide-thumbnail.active .slide-info {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.slide-number {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.slide-title {
+  font-size: 0.875rem;
+  margin-bottom: 4px;
+}
+
+.slide-info {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* Drag and drop styles for slide navigator */
+.slide-thumbnail {
+  position: relative;
+  cursor: grab;
+}
+
+.slide-thumbnail:active {
+  cursor: grabbing;
+}
+
+.slide-thumbnail.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  z-index: 1000;
+  cursor: grabbing;
+}
+
+.slide-thumbnail.drag-over {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 122, 204, 0.4);
+}
+
+.drag-indicator {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.slide-thumbnail:hover .drag-indicator {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
+.slide-thumbnail.dragging .drag-indicator {
+  opacity: 0;
+}
+
+/* Action buttons in control panel */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.action-button {
+  padding: 8px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-button:hover {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+/* Slide jump form styling */
+.slide-jump-form {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.slide-jump-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.slide-jump-input {
+  width: 60px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  background: var(--color-background);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast);
+}
+
+.slide-jump-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.1);
+}
+
+.slide-jump-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.slide-jump-button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.slide-jump-button:disabled {
+  background: var(--color-disabled);
+  cursor: not-allowed;
+}
+
+/* Enhanced slide controls */
+.slide-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.navigation-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navigation-button:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.navigation-button:disabled {
+  background: var(--color-disabled);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.slide-counter {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  font-weight: 500;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.add-slide-button-top {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-tertiary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.add-slide-button-top:hover {
+  background: var(--color-green);
+}
+
+/* Top action buttons */
+.top-action-button {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.top-action-button:hover {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.top-action-button.brainstorm-button:hover {
+  background: var(--color-purple);
+  border-color: var(--color-purple);
+}
+
+.top-action-button.navigator-button:hover {
+  background: var(--color-blue);
+  border-color: var(--color-blue);
+}
+
+/* Conversational chat enhancements */
+.typing-indicator {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: var(--spacing-xs);
+  text-align: center;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.mode-switch-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--color-text);
+  margin-left: var(--spacing-sm);
+}
+
+.mode-switch-button:hover {
+  background: var(--color-purple);
+  color: white;
+  border-color: var(--color-purple);
+}
+
+/* .conversation-history from .chat-interface (around line 1171) removed, covered by base. */
+
+.message {
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  line-height: 1.5;
+}
+
+.message-user {
+  background: var(--color-primary-light);
+  border-left: 4px solid var(--color-primary);
+  margin-left: var(--spacing-lg);
+  color: var(--color-black); /* Darker text color */
+  font-weight: 500; /* Slightly bolder */
+}
+
+.message-assistant {
+  background: var(--color-surface);
+  border-left: 4px solid var(--color-tertiary);
+  margin-right: var(--spacing-lg);
+  color: var(--color-black); /* Darker text color */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Add subtle shadow for better visibility */
+}
+
+.message strong {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.message-user strong {
+  color: var(--color-primary);
+}
+
+.message-assistant strong {
+  color: var(--color-tertiary);
+}
+
+/* Scrollbar styles for .conversation-history from .chat-interface (around line 1220) removed, covered by unified style. */
+
+/* Enhanced dialog input area */
+.dialog-input-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.dialog-textarea {
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  line-height: 1.4;
+  background: var(--color-background);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast);
+}
+
+.dialog-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.1);
+}
+
+.dialog-textarea::placeholder {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Button container for chat actions */
+.dialog-button-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.dialog-submit {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  min-width: 120px;
+}
+
+.dialog-submit:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.dialog-submit:disabled {
+  background: var(--color-disabled);
+  cursor: not-allowed;
+}
+
+/* Bottom Chat Panel */
+.bottom-chat-panel {
+  grid-row: 3; /* Assign to the third row of the app layout grid */
+  /* position: fixed; Removed */
+  /* bottom: 0; Removed */
+  /* left: 0; Removed */
+  /* right: 0; Removed */
+  background: var(--color-background);
+  border-top: 3px solid var(--color-primary);
+  z-index: 1000; /* Will be addressed by z-index system later */
+  transition: all var(--transition-normal);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
+  /* width: 100%; Grid item stretches by default */
+  overflow: hidden; /* Ensure content within panel doesn't break layout */
+}
+
+.bottom-chat-panel.collapsed {
+  height: var(--chat-panel-collapsed-height); /* Increased height for better visibility */
+  background: var(--color-primary-light);
+}
+
+.bottom-chat-panel.expanded {
+  height: var(--chat-panel-expanded-height); /* Increased height for better visibility */
+}
+
+/* Chat Header (always visible) */
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-primary-light);
+  border-bottom: 2px solid var(--color-primary);
+  min-height: 60px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.chat-header:hover {
+  background: var(--color-surface-hover);
+  filter: brightness(1.05);
+}
+
+.chat-icon {
+  font-size: var(--font-size-xl); /* Larger icon */
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-right: var(--spacing-xs);
+}
+
+.chat-title {
+  font-weight: 700; /* Bolder font */
+  font-size: var(--font-size-lg); /* Larger font size */
+  color: var(--color-primary-dark);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.message-count {
+  font-size: var(--font-size-sm); /* Increased font size */
+  color: white;
+  background: var(--color-primary); /* More visible color */
+  padding: 3px 8px;
+  border-radius: var(--radius-full); /* Pill shape */
+  border: none;
+  font-weight: bold;
+  margin-left: var(--spacing-sm);
+}
+
+.slide-context {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-left: var(--spacing-md);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.chat-controls {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.chat-control-btn {
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  cursor: pointer;
+  color: white;
+  font-size: var(--font-size-md);
+  transition: all var(--transition-fast);
+  min-width: 50px; /* Increased width for better visibility */
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
+  margin-left: var(--spacing-sm);
+}
+
+.chat-control-btn:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-2px); /* Slight lift effect on hover */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.clear-btn {
+  background: var(--color-error);
+}
+
+.clear-btn:hover {
+  background: var(--color-danger);
+}
+
+.expand-btn {
+  background: var(--color-primary);
+  font-size: var(--font-size-lg); /* Larger font for better visibility */
+  font-weight: bold;
+}
+
+.expand-btn:hover {
+  background: var(--color-primary-hover);
+}
+
+/* Chat Content (only visible when expanded) */
+.chat-content {
+  height: 200px; /* Reduced height to prevent obscuring too much slide content */
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-top: 1px solid var(--color-border);
+  overflow: hidden; /* Prevent content overflow */
+}
+
+.chat-content .conversation-history {
+  /* Overrides for .conversation-history within .chat-content (bottom chat panel) */
+  background: var(--color-surface); /* Override base background */
+  margin: var(--spacing-sm) var(--spacing-md); /* Add specific margin */
+  /* flex, padding, border, radius are inherited from the base .conversation-history style */
+  /* max-height is not set here; height is controlled by .chat-content's height and flex:1 */
+}
+
+.welcome-message-compact {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--spacing-md);
+}
+
+.welcome-message-compact p {
+  margin-bottom: var(--spacing-xs);
+}
+
+.welcome-message-compact strong {
+  color: var(--color-text);
+}
+
+/* Chat Input Area */
+.chat-input-area {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-background);
+  border-top: 1px solid var(--color-border);
+  align-items: flex-end;
+}
+
+.chat-textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 80px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  resize: none;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.chat-textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.chat-textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.chat-send-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-md); /* Increased font size */
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 80px; /* Increased width */
+  height: 44px; /* Increased height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Added shadow */
+}
+
+.chat-send-btn:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+  transform: translateY(-2px); /* Enhanced hover effect */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.chat-send-btn:disabled {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .bottom-chat-panel.expanded {
+    height: var(--chat-panel-expanded-height-mobile); /* Increased height for mobile */
+  }
+  
+  .chat-content {
+    height: 260px; /* Increased height */
+  }
+  
+  .chat-textarea {
+    font-size: var(--font-size-md);
+  }
+  
+  .chat-control-btn {
+    min-width: 44px; /* Slightly smaller on mobile */
+  }
+  
+  .chat-send-btn {
+    min-width: 70px; /* Slightly smaller on mobile */
+  }
+}
+
+/* Responsive .chat-content .conversation-history and scrollbars (around line 1562) removed, covered by base. */
