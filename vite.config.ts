@@ -1,4 +1,6 @@
-import { defineConfig, loadEnv } from 'vite'
+/// <reference types="vitest" />
+import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
@@ -32,9 +34,7 @@ export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current directory.
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd())
-  console.log('Loaded environment mode:', mode)
-  console.log('Environment keys:', Object.keys(env).filter(key => key.startsWith('VITE_')))
-  
+
   return {
     plugins: [react()],
     define: {
@@ -47,9 +47,18 @@ export default defineConfig(({ mode }) => {
     },
     // Force clear cache when environment variables change
     server: {
+      host: true,
       fs: {
         strict: false
       }
-    }
+    },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.ts',
+      coverage: {
+        reporter: ['text', 'lcov', 'html', 'json-summary'],
+      },
+    },
   }
 })

@@ -1,0 +1,15 @@
+.error-boundary-fallback {
+  padding: 20px;
+  border: 1px solid red;
+  border-radius: 8px;
+  background-color: #fff0f0;
+}
+
+.error-boundary-fallback h2 {
+  color: red;
+}
+
+.error-boundary-fallback details {
+  white-space: pre-wrap;
+  margin-top: 10px;
+}

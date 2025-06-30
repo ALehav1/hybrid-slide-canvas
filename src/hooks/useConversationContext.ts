@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { ConversationContext, type ConversationContextType } from '../components/ConversationProvider';
+import { ConversationContext, type ConversationContextType } from '../context/ConversationContext';
 
 /**
  * Hook to use enhanced conversation context

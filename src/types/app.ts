@@ -1,5 +1,5 @@
 /**
- * Core application types for the hybrid canvas project
+ * Core application types for the Hybrid Slide Canvas project
  */
 import type { TLShapeId } from 'tldraw';
 

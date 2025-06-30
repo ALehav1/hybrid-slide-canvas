@@ -1,80 +1,16 @@
-import React, { createContext, useState, useCallback, useRef, type ReactNode } from 'react';
+import React, { useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
+import {
+  ConversationContext,
+  type ConversationContextType,
+  type ConversationMessage,
+  type SlideConversation,
+} from '../context/ConversationContext';
 import { logger } from '../lib/utils/logging';
+import { openai } from '../lib/openaiClient';
+import { type AiAction, AiActionSchema } from './Chat/aiActions';
 
-/**
- * Conversation Message Types
- */
-export interface ConversationMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-export interface SlideConversation {
-  slideId: string;
-  messages: ConversationMessage[];
-  lastModified: number;
-}
-
-/**
- * Enhanced Conversation Context Types
- * Provides centralized conversation state management across the app
- * Combines UI state, conversation data, and business logic
- */
-interface ConversationContextType {
-  // UI State
-  dialogInput: string;
-  isChatExpanded: boolean;
-  showSlideNavigator: boolean;
-  slideNumberInput: string;
-  
-  // Loading & Error States
-  localIsLoading: boolean;
-  localIsTyping: boolean;
-  localError: string | null;
-  
-  // Drag & Drop State
-  draggedSlide: number | null;
-  dragOverSlide: number | null;
-  
-  // Conversation Data
-  conversations: Map<string, SlideConversation>;
-  conversationVersion: number; // Incremented when conversations change to force re-renders
-  
-  // UI State Setters
-  setDialogInput: (input: string) => void;
-  setIsChatExpanded: (expanded: boolean) => void;
-  setShowSlideNavigator: (show: boolean) => void;
-  setSlideNumberInput: (input: string) => void;
-  setLocalIsLoading: (loading: boolean) => void;
-  setLocalIsTyping: (typing: boolean) => void;
-  setLocalError: (error: string | null) => void;
-  setDraggedSlide: (slide: number | null) => void;
-  setDragOverSlide: (slide: number | null) => void;
-  
-  // Conversation Data Methods
-  getConversation: (slideId: string) => SlideConversation;
-  addMessage: (slideId: string, role: 'user' | 'assistant', content: string) => SlideConversation;
-  clearConversation: (slideId: string) => void;
-  clearAllConversations: () => void;
-  getConversationContext: (slideId: string, maxMessages?: number) => string;
-  getMessagesForSlide: (slideId: string) => ConversationMessage[];
-  getAllConversations: () => SlideConversation[];
-  
-  // UI Convenience Methods
-  toggleChatExpanded: () => void;
-  toggleSlideNavigator: () => void;
-  clearError: () => void;
-  resetDragState: () => void;
-  clearInput: () => void;
-  resetChatState: () => void;
-}
-
-// Export types for the hook
-export type { ConversationContextType };
-
-// Create and export Context
-export const ConversationContext = createContext<ConversationContextType | undefined>(undefined);
+const SLIDE_ID_REGEX = /^slide-[\w-]+$/;
+const MAX_MESSAGE_LENGTH = 10000;
 
 /**
  * ConversationProvider Props
@@ -122,6 +58,42 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   
   // Conversation Data State
   const conversationsRef = useRef<Map<string, SlideConversation>>(new Map());
+  const submitQueueRef = useRef<Promise<AiAction | null>>(Promise.resolve(null));
+  const MAX_CONVERSATIONS = 100; // Max conversations to keep in memory
+
+  // --- State Persistence ---
+
+  // Load state from localStorage on initial render
+  React.useEffect(() => {
+    try {
+      const savedState = localStorage.getItem('conversationState');
+      if (savedState) {
+        const { conversations, isChatExpanded } = JSON.parse(savedState);
+        if (conversations) {
+          conversationsRef.current = new Map(conversations);
+          setConversationVersion((v) => v + 1); // Force re-render
+        }
+        if (typeof isChatExpanded === 'boolean') {
+          setIsChatExpanded(isChatExpanded);
+        }
+      }
+    } catch (error) {
+      logger.error('Failed to load conversation state from localStorage', error);
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Save state to localStorage whenever it changes
+  React.useEffect(() => {
+    try {
+      const stateToSave = {
+        conversations: Array.from(conversationsRef.current.entries()),
+        isChatExpanded,
+      };
+      localStorage.setItem('conversationState', JSON.stringify(stateToSave));
+    } catch (error) {
+      logger.error('Failed to save conversation state to localStorage', error);
+    }
+  }, [conversationVersion, isChatExpanded]);
 
   // UI Convenience Methods
   const toggleChatExpanded = useCallback(() => {
@@ -168,24 +140,41 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   }, []);
   
   const addMessage = useCallback((slideId: string, role: 'user' | 'assistant', content: string): SlideConversation => {
+    // Validate slideId format
+    if (!SLIDE_ID_REGEX.test(slideId)) {
+      const errorMsg = `Invalid slideId format: ${slideId}`;
+      logger.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    // Validate message length
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      const errorMsg = `Message too long: ${content.length} characters (max: ${MAX_MESSAGE_LENGTH})`;
+      logger.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
     const conversation = getConversation(slideId);
-    const newMessage: ConversationMessage = {
-      role,
-      content,
-      timestamp: new Date()
-    };
-    
-    conversation.messages.push(newMessage);
+    conversation.messages.push({ role, content, timestamp: new Date() });
     conversation.lastModified = Date.now();
-    
-    // Increment version to trigger re-render
-    setConversationVersion(prev => prev + 1);
-    
-    logger.debug(`Added message to conversation for slideId: ${slideId}`);
-    
+    conversationsRef.current.set(slideId, conversation);
+
+    // Cleanup old conversations if exceeding limit
+    if (conversationsRef.current.size > MAX_CONVERSATIONS) {
+      const sortedConversations = Array.from(conversationsRef.current.entries())
+        .sort((a, b) => a[1].lastModified - b[1].lastModified);
+      
+      // Remove oldest 10% of conversations
+      const toRemove = Math.floor(MAX_CONVERSATIONS * 0.1);
+      for (let i = 0; i < toRemove; i++) {
+        conversationsRef.current.delete(sortedConversations[i][0]);
+      }
+    }
+
+    setConversationVersion(v => v + 1);
     return conversation;
   }, [getConversation]);
-  
+
   const clearConversation = useCallback((slideId: string) => {
     conversationsRef.current.delete(slideId);
     
@@ -224,14 +213,65 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     }
     const conversation = conversations.get(slideId)!;
     return [...conversation.messages]; // Return copy to prevent mutations
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationVersion]); 
   
   const getAllConversations = useCallback((): SlideConversation[] => {
     return Array.from(conversationsRef.current.values());
   }, []); 
   
-  // Context value with all state and methods
-  const contextValue: ConversationContextType = {
+  const submitUserMessage = useCallback(
+    (slideId: string, content: string): Promise<AiAction | null> => {
+      if (!content.trim()) return Promise.resolve(null);
+
+      const newPromise = submitQueueRef.current.then(async () => {
+        setLocalIsLoading(true);
+        setLocalError(null);
+        addMessage(slideId, 'user', content);
+
+        try {
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            messages: [{ role: 'user', content: content }],
+          });
+
+          const text = completion.choices[0].message.content ?? '';
+          addMessage(slideId, 'assistant', text);
+
+          // try to parse JSON block fenced with ```json
+          const match = text.match(/```json([\s\S]*?)```/);
+          if (match) {
+            try {
+              const obj = JSON.parse(match[1]);
+              const parsed = AiActionSchema.safeParse(obj);
+              if (parsed.success) {
+                return parsed.data;
+              } else {
+                logger.error('AI action validation failed', parsed.error);
+                setLocalError('AI returned an invalid action.');
+              }
+            } catch (e) {
+              logger.error('Failed to parse AI action JSON', e);
+              setLocalError('Failed to parse AI action.');
+            }
+          }
+          return null;
+        } catch (error) {
+          logger.error('Error fetching AI completion', error);
+          setLocalError('Failed to get response from AI.');
+          return null;
+        } finally {
+          setLocalIsLoading(false);
+        }
+      });
+      submitQueueRef.current = newPromise;
+      return newPromise;
+    },
+    [addMessage]
+  );
+
+  // Context value with all state and methods, memoized to prevent unnecessary re-renders
+  const contextValue: ConversationContextType = useMemo(() => ({
     // UI State
     dialogInput,
     isChatExpanded,
@@ -277,8 +317,43 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     clearError,
     resetDragState,
     clearInput,
-    resetChatState
-  };
+    resetChatState,
+    submitUserMessage
+  }), [
+    dialogInput,
+    isChatExpanded,
+    showSlideNavigator,
+    slideNumberInput,
+    localIsLoading,
+    localIsTyping,
+    localError,
+    draggedSlide,
+    dragOverSlide,
+    conversationVersion,
+    getConversation,
+    addMessage,
+    clearConversation,
+    clearAllConversations,
+    getConversationContext,
+    getMessagesForSlide,
+    getAllConversations,
+    toggleChatExpanded,
+    toggleSlideNavigator,
+    clearError,
+    resetDragState,
+    clearInput,
+    resetChatState,
+    submitUserMessage,
+    setDialogInput,
+    setIsChatExpanded,
+    setShowSlideNavigator,
+    setSlideNumberInput,
+    setLocalIsLoading,
+    setLocalIsTyping,
+    setLocalError,
+    setDraggedSlide,
+    setDragOverSlide
+  ]);
   
   logger.debug('ConversationProvider rendered with state');
   
