@@ -45,6 +45,18 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       exclude: [],
     },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, './src'),
+        '@components': path.resolve(__dirname, './src/components'),
+        '@hooks': path.resolve(__dirname, './src/hooks'),
+        '@lib': path.resolve(__dirname, './src/lib'),
+        '@state': path.resolve(__dirname, './src/state'),
+        '@types': path.resolve(__dirname, './src/types'),
+        '@context': path.resolve(__dirname, './src/context'),
+        '@tests': path.resolve(__dirname, './src/__tests__')
+      }
+    },
     // Force clear cache when environment variables change
     server: {
       host: true,
@@ -57,8 +69,28 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/setupTests.ts',
       coverage: {
+        provider: 'v8',
         reporter: ['text', 'lcov', 'html', 'json-summary'],
+        exclude: [
+          'coverage/**',
+          'dist/**',
+          '**/node_modules/**',
+          '**/*.d.ts',
+          'src/mocks/**',
+          '**/__mocks__/**',
+          'src/main.tsx'
+        ],
+        thresholds: {
+          statements: 80,
+          branches: 75,
+          functions: 80,
+          lines: 80
+        }
       },
+      // Retry tests to handle flaky tests
+      retry: 2,
+      // Timeout for async tests
+      testTimeout: 10000
     },
   }
 })

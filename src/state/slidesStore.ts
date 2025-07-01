@@ -1,188 +1,244 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { type Editor, createShapeId, type TLShapeId } from '@tldraw/tldraw';
-import { logger } from '../lib/utils/logging';
+/* --------------------------------------------------------------------------
+   slidesStore.ts  –  one-file, compile-clean replacement
+   -------------------------------------------------------------------------- */
 
-// The core data structure for a single slide
-export type Slide = {
-  id: string; // Unique identifier for the slide
-  frameId: TLShapeId; // The ID of the corresponding frame shape in tldraw
-  title?: string; // Optional title
-  thumbnail: string; // URL or data URI for the thumbnail
-};
+/* =====  1.  External deps  ===== */
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
+import { nanoid } from 'nanoid'
+import Dexie from 'dexie'
+import type { Draft } from 'immer'
+import type { Editor, TLShapeId } from '@tldraw/tldraw'
+import { deepFreeze } from '../lib/utils/deepFreeze'
+import { createUniqueShapeId } from '../lib/utils/clientId'
+import { createWelcomeMessage } from '../lib/utils/conversationUtils'
 
-// The state and actions for the slides store
-export interface SlidesState {
-  slides: Slide[];
-  currentSlideId: string;
-  addFrameSlide: (editor: Editor) => void;
-  deleteSlide: (slideId: string, editor: Editor) => void;
-  setCurrentSlide: (id: string, editor: Editor) => void; // Will also handle jumping
-  reorderSlides: (fromId: string, toId: string) => void;
-  reset: () => void;
+/* ===========================================================================
+   2.  Minimal shared-type definitions  (✨ extract to "@/types/app.ts")
+   =========================================================================== */
+type MessageRole = 'user' | 'assistant'
+
+export interface ConversationMessage {
+  id: string
+  role: MessageRole
+  content: string
+  timestamp: Date
 }
 
-const initialSlidesState = {
-  slides: [
-    {
-      id: 'slide-1',
-      frameId: createShapeId('frame_1'),
-      thumbnail: '/placeholder.png',
-      title: 'Slide 1',
-    },
-  ],
+export interface SlideData {
+  id: string
+  number: number
+  title: string
+  frameId: TLShapeId
+  conversation: ConversationMessage[]
+  createdAt: Date
+  updatedAt: Date
+  thumbnailUrl?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface SlidesStateData {
+  slides: SlideData[]
+  currentSlideId: string
+}
+
+/* ===========================================================================
+   3.  Utility helpers (imported from utils directory)
+   =========================================================================== */
+
+// Utility functions are now imported from their canonical locations
+
+/* ===========================================================================
+   4.  Dexie-based Zustand storage adapter  (✨ extract to "@/lib/storage")
+   =========================================================================== */
+class HybridDB extends Dexie {
+  zustand!: Dexie.Table<{ id: string; value: string }, string>
+  constructor() {
+    super('hybrid-slide-canvas')
+    this.version(1).stores({ zustand: 'id' })
+  }
+}
+const db = new HybridDB()
+
+const dexieStorage: StateStorage = {
+  getItem: async (key) => (await db.zustand.get(key))?.value ?? null,
+  setItem: async (key, val) => db.zustand.put({ id: key, value: val }),
+  removeItem: async (key) => db.zustand.delete(key),
+}
+
+/* ===========================================================================
+   5.  Initial-state factory
+   =========================================================================== */
+const makeInitialSlide = (id = 'slide-1'): SlideData => ({
+  id,
+  number: 1,
+  title: 'Welcome to Hybrid Slide Canvas',
+  frameId: createUniqueShapeId(),
+  conversation: [createWelcomeMessage()],
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  metadata: { isInitial: true },
+  thumbnailUrl: '/placeholder.png',
+})
+
+const initialState: SlidesStateData = {
+  slides: [makeInitialSlide()],
   currentSlideId: 'slide-1',
-};
+}
 
-export const useSlidesStore = create<SlidesState>()(
-  persist(
-    (set, get) => ({
-      ...initialSlidesState,
+/* ===========================================================================
+   6.  Slides store – state + actions
+   =========================================================================== */
+export interface SlidesState extends SlidesStateData {
+  addFrameSlide: (editor: Editor) => void
+  deleteSlide: (slideId: string, editor?: Editor) => void
+  setCurrentSlide: (id: string, editor?: Editor) => void
+  reorderSlides: (fromIdx: number, toIdx: number) => void
+  duplicateSlide: (slideId: string) => void
+  updateSlideMetadata: (slideId: string, title: string) => void
+  addMessage: (slideId: string, role: MessageRole, content: string) => void
+  reset: () => void
+}
 
-      /**
-       * Adds a new slide with a corresponding frame in the editor.
-       */
-      addFrameSlide: (editor: Editor) => {
-        if (!editor) return;
+const logic = (set: any, get: any): SlidesState => ({
+  ...initialState,
 
-        const newSlideNumber = get().slides.length + 1;
-        const id = `slide-${newSlideNumber}`;
-        const frameId = createShapeId(`frame_${newSlideNumber}`);
-        const title = `Slide ${newSlideNumber}`;
+  addFrameSlide: (editor) =>
+    set((draft: Draft<SlidesState>) => {
+      const idx = draft.slides.length + 1
+      const id = `slide-${nanoid(8)}`
+      const frameId = createUniqueShapeId()
 
-        logger.info('Adding new slide', { id, frameId });
+      draft.slides.push({
+        ...makeInitialSlide(id),
+        number: idx,
+        frameId,
+        title: `Slide ${idx}`,
+      })
+      draft.currentSlideId = id
 
-        const newSlide: Slide = {
-          id,
-          frameId,
-          title,
-          thumbnail: '/placeholder.png', // Placeholder, will be updated later
-        };
+      editor?.createShapes?.([
+        {
+          id: frameId as TLShapeId,
+          type: 'frame',
+          x: idx * 1200,
+          y: 0,
+          props: { w: 960, h: 540, name: `Slide ${idx}` },
+        },
+      ])
 
-        // Create the frame shape in the tldraw canvas
-        const frameShape = {
-          id: frameId,
-          type: 'frame' as const,
-          x: 100 + (newSlideNumber - 1) * 850, // Position new frames side-by-side
-          y: 100,
-          props: { w: 800, h: 600, name: title },
-        };
-        editor.createShapes([frameShape]);
-
-        set((state) => ({
-          slides: [...state.slides, newSlide],
-          currentSlideId: id,
-        }));
-
-        // Zoom to fit the new frame after a short delay
-        setTimeout(() => {
-          const shape = editor.getShape(frameId);
-          if (shape) {
-            const bounds = editor.getShapePageBounds(shape);
-            if (bounds) {
-              editor.zoomToBounds(bounds, { animation: { duration: 300 } });
-            }
-          }
-        }, 100);
-      },
-
-      /**
-       * Deletes a slide and its corresponding frame from the editor.
-       */
-      deleteSlide: (slideId: string, editor: Editor) => {
-        if (!editor) return;
-        if (get().slides.length <= 1) {
-          logger.warn('Cannot delete the last slide');
-          return;
-        }
-
-        const slideToDelete = get().slides.find((s) => s.id === slideId);
-        if (!slideToDelete) {
-          logger.error('Slide to delete not found', { slideId });
-          return;
-        }
-
-        logger.info('Deleting slide', { slideId });
-
-        // Delete the frame from the tldraw canvas
-        editor.deleteShapes([slideToDelete.frameId]);
-
-        set((state) => {
-          const remainingSlides = state.slides.filter((s) => s.id !== slideId);
-          let newCurrentSlideId = state.currentSlideId;
-
-          // If the deleted slide was the current one, select the previous or first slide
-          if (state.currentSlideId === slideId) {
-            const deletedIndex = state.slides.findIndex((s) => s.id === slideId);
-            const newIndex = Math.max(0, deletedIndex - 1);
-            newCurrentSlideId = remainingSlides[newIndex].id;
-          }
-
-          return {
-            slides: remainingSlides,
-            currentSlideId: newCurrentSlideId,
-          };
-        });
-      },
-
-      /**
-       * Sets the current slide and focuses the editor on its frame.
-       */
-      setCurrentSlide: (id: string, editor: Editor) => {
-        if (!editor) {
-          set({ currentSlideId: id });
-          return;
-        }
-
-        const targetSlide = get().slides.find((s) => s.id === id);
-        if (!targetSlide) {
-          logger.warn('Slide not found', { id });
-          return;
-        }
-
-        logger.debug('Jumping to slide', { from: get().currentSlideId, to: id });
-        set({ currentSlideId: id });
-
-        // Zoom to the frame associated with the slide
-        const shape = editor.getShape(targetSlide.frameId);
-        if (shape) {
-          const bounds = editor.getShapePageBounds(shape);
-          if (bounds) {
-            editor.zoomToBounds(bounds, { animation: { duration: 300 } });
-          }
-        }
-      },
-
-      /**
-       * Reorders slides based on a drag-and-drop operation.
-       */
-      reorderSlides: (fromId: string, toId: string) => {
-        if (fromId === toId) return;
-
-        logger.info('Reordering slides', { from: fromId, to: toId });
-
-        set((state) => {
-          const slides = [...state.slides];
-          const fromIndex = slides.findIndex((s) => s.id === fromId);
-          const toIndex = slides.findIndex((s) => s.id === toId);
-
-          if (fromIndex === -1 || toIndex === -1) {
-            logger.error('Could not find slides for reordering', { fromId, toId });
-            return state;
-          }
-
-          const [movedSlide] = slides.splice(fromIndex, 1);
-          slides.splice(toIndex, 0, movedSlide);
-
-          return { slides };
-        });
-      },
-
-      /**
-       * Resets the store to its initial state.
-       */
-      reset: () => set(initialSlidesState),
+      // TLDraw expects an array of IDs
+      editor?.select?.(frameId)
     }),
-    { name: 'slides-store' } // key used in localStorage
-  )
-);
+
+  deleteSlide: (slideId, editor) =>
+    set((draft: Draft<SlidesState>) => {
+      if (draft.slides.length === 1) return
+      const idx = draft.slides.findIndex((s) => s.id === slideId)
+      if (idx === -1) return
+      const [{ frameId }] = draft.slides.splice(idx, 1)
+      draft.slides.forEach((s, i) => (s.number = i + 1))
+      if (draft.currentSlideId === slideId) draft.currentSlideId = draft.slides[Math.max(0, idx - 1)].id
+      editor?.deleteShapes?.([frameId])
+    }),
+
+  setCurrentSlide: (id, editor) =>
+    set((draft: Draft<SlidesState>) => {
+      if (!draft.slides.some((s) => s.id === id)) return
+      draft.currentSlideId = id
+      const slide = draft.slides.find((s) => s.id === id)!
+      editor?.select?.(slide.frameId)
+    }),
+
+  reorderSlides: (from, to) =>
+    set((draft: Draft<SlidesState>) => {
+      const [s] = draft.slides.splice(from, 1)
+      draft.slides.splice(to, 0, s)
+      draft.slides.forEach((sl, i) => (sl.number = i + 1))
+    }),
+
+  duplicateSlide: (slideId) =>
+    set((draft: Draft<SlidesState>) => {
+      const src = draft.slides.find((s) => s.id === slideId)
+      if (!src) return
+      const id = `slide-${nanoid(8)}`
+      const frameId = createUniqueShapeId()
+      const insertAt = draft.slides.findIndex((s) => s.id === slideId) + 1
+      draft.slides.splice(insertAt, 0, {
+        ...src,
+        id,
+        frameId,
+        title: `${src.title} (Copy)`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        conversation: [],
+        metadata: { ...src.metadata, duplicatedFrom: slideId },
+        number: 0,
+      })
+      draft.slides.forEach((sl, i) => (sl.number = i + 1))
+      draft.currentSlideId = id
+    }),
+
+  updateSlideMetadata: (slideId, title) =>
+    set((draft: Draft<SlidesState>) => {
+      const s = draft.slides.find((sl) => sl.id === slideId)
+      if (s) {
+        s.title = title
+        s.updatedAt = new Date()
+      }
+    }),
+
+  addMessage: (slideId, role, content) =>
+    set((draft: Draft<SlidesState>) => {
+      const s = draft.slides.find((sl) => sl.id === slideId)
+      if (!s) return
+      s.conversation.push({ id: nanoid(), role, content, timestamp: new Date() })
+      s.updatedAt = new Date()
+    }),
+
+  reset: () => set(structuredClone(initialState), true),
+})
+
+/* ===========================================================================
+   7.  Persist config & store creation
+   =========================================================================== */
+const store = create<SlidesState>()(
+  // dev-only deep freeze catches accidental mutations _after_ Immer
+  ((config) =>
+    (set, get, api) =>
+      config(
+        (fn, replace) =>
+          set(
+            (state) => (import.meta.env.DEV ? deepFreeze(typeof fn === 'function' ? fn(state) : fn) : fn),
+            replace,
+          ),
+        get,
+        api,
+      ))(
+    persist(
+      immer(logic),
+      {
+        name: 'slides-store',
+        partialize: (s): SlidesStateData => ({
+          slides: s.slides,
+          currentSlideId: s.currentSlideId,
+        }),
+        merge: (saved, cur) => {
+          if (!saved) return cur
+          const data = saved as SlidesStateData
+          data.slides.forEach((sl) => {
+            sl.createdAt = new Date(sl.createdAt)
+            sl.updatedAt = new Date(sl.updatedAt)
+            sl.conversation.forEach((m) => (m.timestamp = new Date(m.timestamp)))
+          })
+          return { ...cur, ...data }
+        },
+        storage: createJSONStorage(() => dexieStorage),
+      },
+    ),
+  ),
+)
+
+/* eslint-disable-next-line import/no-default-export */
+export default store

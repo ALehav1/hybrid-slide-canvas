@@ -32,6 +32,7 @@ const renderWithMockContext = (contextValue: Partial<ConversationContextType>) =
     setIsChatExpanded: contextValue.setIsChatExpanded ?? vi.fn(),
     localIsLoading: contextValue.localIsLoading ?? false,
     localError: contextValue.localError ?? null,
+    isPending: contextValue.isPending ?? false,
     clearError: contextValue.clearError ?? vi.fn(),
     getMessagesForSlide: contextValue.getMessagesForSlide ?? vi.fn().mockReturnValue([]),
     submitUserMessage: contextValue.submitUserMessage ?? vi.fn(),

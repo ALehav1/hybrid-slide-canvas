@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo, type ReactNode } from 'react';
+import React, { useState, useCallback, useRef, useMemo, useTransition, type ReactNode, useEffect } from 'react';
 import {
   ConversationContext,
   type ConversationContextType,
@@ -8,6 +8,8 @@ import {
 import { logger } from '../lib/utils/logging';
 import { openai } from '../lib/openaiClient';
 import { type AiAction, AiActionSchema } from './Chat/aiActions';
+import { ErrorBoundary } from './ErrorBoundary';
+import conversationStore, { CONVERSATION_STORE_KEY } from '../lib/storage/conversationStorage';
 
 const SLIDE_ID_REGEX = /^slide-[\w-]+$/;
 const MAX_MESSAGE_LENGTH = 10000;
@@ -45,9 +47,13 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   const [slideNumberInput, setSlideNumberInput] = useState('');
   
   // Loading & Error States
-  const [localIsLoading, setLocalIsLoading] = useState(false);
+  const [localIsLoading, setLocalIsLoading] = useState(false); // General loading state
+  const [storageIsLoading, setStorageIsLoading] = useState(true); // Specific to Dexie storage loading
   const [localIsTyping, setLocalIsTyping] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  
+  // React 19 useTransition for smoother UI during state updates
+  const [isPending, startTransition] = useTransition();
   
   // Conversation state version counter - incremented to force re-renders when Map changes
   const [conversationVersion, setConversationVersion] = useState(0);
@@ -62,37 +68,72 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   const MAX_CONVERSATIONS = 100; // Max conversations to keep in memory
 
   // --- State Persistence ---
-
-  // Load state from localStorage on initial render
-  React.useEffect(() => {
-    try {
-      const savedState = localStorage.getItem('conversationState');
-      if (savedState) {
-        const { conversations, isChatExpanded } = JSON.parse(savedState);
-        if (conversations) {
-          conversationsRef.current = new Map(conversations);
-          setConversationVersion((v) => v + 1); // Force re-render
-        }
-        if (typeof isChatExpanded === 'boolean') {
-          setIsChatExpanded(isChatExpanded);
-        }
-      }
-    } catch (error) {
-      logger.error('Failed to load conversation state from localStorage', error);
-    }
+  
+  // Initialize the conversation storage
+  useEffect(() => {
+    conversationStore.init().catch(error => {
+      logger.error('Failed to initialize conversation storage', error);
+    });
   }, []); // Empty dependency array ensures this runs only once on mount
 
-  // Save state to localStorage whenever it changes
-  React.useEffect(() => {
-    try {
-      const stateToSave = {
-        conversations: Array.from(conversationsRef.current.entries()),
-        isChatExpanded,
-      };
-      localStorage.setItem('conversationState', JSON.stringify(stateToSave));
-    } catch (error) {
-      logger.error('Failed to save conversation state to localStorage', error);
-    }
+  // Load state from Dexie on initial render
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadState = async () => {
+      try {
+        // Set loading state during initialization
+        setStorageIsLoading(true);
+        
+        const savedState = await conversationStore.getItem(CONVERSATION_STORE_KEY);
+        if (savedState && isMounted) {
+          const { conversations, isChatExpanded } = JSON.parse(savedState);
+          if (conversations) {
+            conversationsRef.current = new Map(conversations);
+            setConversationVersion((v) => v + 1); // Force re-render
+          }
+          if (typeof isChatExpanded === 'boolean') {
+            setIsChatExpanded(isChatExpanded);
+          }
+          logger.debug('Loaded conversation state from Dexie storage');
+        }
+      } catch (error) {
+        logger.error('Failed to load conversation state from Dexie', error);
+      } finally {
+        if (isMounted) {
+          setStorageIsLoading(false);
+        }
+      }
+    };
+    
+    loadState();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  // Save state to Dexie whenever it changes
+  useEffect(() => {
+    const saveState = async () => {
+      try {
+        const stateToSave = {
+          conversations: Array.from(conversationsRef.current.entries()),
+          isChatExpanded,
+        };
+        await conversationStore.setItem(CONVERSATION_STORE_KEY, JSON.stringify(stateToSave));
+        logger.debug('Saved conversation state to Dexie storage');
+      } catch (error) {
+        logger.error('Failed to save conversation state to Dexie', error);
+      }
+    };
+    
+    // Debounce save operations to avoid excessive writes
+    const debounceTimer = setTimeout(saveState, 300);
+    
+    return () => {
+      clearTimeout(debounceTimer);
+    };
   }, [conversationVersion, isChatExpanded]);
 
   // UI Convenience Methods
@@ -220,23 +261,57 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     return Array.from(conversationsRef.current.values());
   }, []); 
   
+  // Resource to cache responses for same inputs
+  const responseCache = useRef<Map<string, Promise<AiAction | null>>>(new Map());
+  
   const submitUserMessage = useCallback(
     (slideId: string, content: string): Promise<AiAction | null> => {
       if (!content.trim()) return Promise.resolve(null);
+      
+      // Create a cache key from slideId and content
+      const cacheKey = `${slideId}:${content.trim()}`;
+      
+      // Check if we have a cached response
+      if (responseCache.current.has(cacheKey)) {
+        logger.debug('Using cached AI response');
+        return responseCache.current.get(cacheKey)!;
+      }
 
       const newPromise = submitQueueRef.current.then(async () => {
-        setLocalIsLoading(true);
-        setLocalError(null);
+        // Use transition to keep UI responsive during heavy computation
+        startTransition(() => {
+          setLocalIsLoading(true);
+          setLocalError(null);
+        });
+        
         addMessage(slideId, 'user', content);
 
         try {
+          // Prepare conversation history for better context
+          const conversation = getConversation(slideId);
+          const messages = conversation.messages.slice(-5); // Get last 5 messages for context
+          
+          // Create messages array for OpenAI API
+          const apiMessages = messages.map(msg => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content
+          }));
+          
+          // If no previous messages, add current message
+          if (apiMessages.length === 0) {
+            apiMessages.push({ role: 'user', content });
+          }
+          
           const completion = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: content }],
+            messages: apiMessages,
           });
 
           const text = completion.choices[0].message.content ?? '';
-          addMessage(slideId, 'assistant', text);
+          // Use transition for updating UI state after response
+          startTransition(() => {
+            addMessage(slideId, 'assistant', text);
+          });
 
           // try to parse JSON block fenced with ```json
           const match = text.match(/```json([\s\S]*?)```/);
@@ -258,12 +333,29 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
           return null;
         } catch (error) {
           logger.error('Error fetching AI completion', error);
-          setLocalError('Failed to get response from AI.');
+          // Use transition for updating error state
+          startTransition(() => {
+            setLocalError('Failed to get response from AI.');
+          });
           return null;
         } finally {
-          setLocalIsLoading(false);
+          // Use transition for updating loading state
+          startTransition(() => {
+            setLocalIsLoading(false);
+          });
         }
       });
+      // Cache the promise for future identical requests
+      responseCache.current.set(cacheKey, newPromise);
+      
+      // Clean up old cache entries if cache grows too large
+      if (responseCache.current.size > 50) {
+        const oldestKey = responseCache.current.keys().next().value;
+        if (oldestKey) { // Make sure oldestKey is not undefined
+          responseCache.current.delete(oldestKey);
+        }
+      }
+      
       submitQueueRef.current = newPromise;
       return newPromise;
     },
@@ -272,6 +364,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
 
   // Context value with all state and methods, memoized to prevent unnecessary re-renders
   const contextValue: ConversationContextType = useMemo(() => ({
+    // Include isPending from useTransition
     // UI State
     dialogInput,
     isChatExpanded,
@@ -280,8 +373,10 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     
     // Loading & Error States
     localIsLoading,
+    storageIsLoading,
     localIsTyping,
     localError,
+    isPending,
     
     // Drag & Drop State
     draggedSlide,
@@ -297,6 +392,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     setShowSlideNavigator,
     setSlideNumberInput,
     setLocalIsLoading,
+    setStorageIsLoading,
     setLocalIsTyping,
     setLocalError,
     setDraggedSlide,
@@ -325,6 +421,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     showSlideNavigator,
     slideNumberInput,
     localIsLoading,
+    storageIsLoading,
     localIsTyping,
     localError,
     draggedSlide,
@@ -357,9 +454,12 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   
   logger.debug('ConversationProvider rendered with state');
   
+  // Wrap children with ErrorBoundary to handle any component errors gracefully
   return (
     <ConversationContext.Provider value={contextValue}>
-      {children}
+      <ErrorBoundary>
+        {children}
+      </ErrorBoundary>
     </ConversationContext.Provider>
   );
 };

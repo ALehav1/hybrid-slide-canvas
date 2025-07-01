@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useTransition } from 'react';
 import { type Editor } from '@tldraw/tldraw';
 import { CanvasSlide } from './components/CanvasSlide';
 import { ChatPanel } from './components/Chat/ChatPanel';
@@ -12,6 +12,8 @@ import { ConversationProvider } from './components/ConversationProvider';
  */
 export default function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
+  // Use React 19's useTransition for smoother UI during slide transitions
+  const [isPending, startTransition] = useTransition();
   const { slides, currentSlideId, setCurrentSlide } = useSlidesStore();
 
   return (
@@ -44,14 +46,17 @@ export default function App() {
             }`}
             onClick={() => {
               if (editor) {
-                setCurrentSlide(s.id, editor);
+                // Use transition for slide changes to prevent UI blocking
+                startTransition(() => {
+                  setCurrentSlide(s.id, editor);
+                });
               }
             }}
           >
             <img
-              src={s.thumbnail}
+              src={s.thumbnailUrl}
               alt={`Slide ${s.title || s.id}`}
-              className="w-full h-full object-cover"
+              className={`w-full h-full object-cover ${s.id === currentSlideId && isPending ? 'opacity-50' : ''}`}
               onError={(e) => (e.currentTarget.style.backgroundColor = '#e5e7eb')}
             />
           </button>

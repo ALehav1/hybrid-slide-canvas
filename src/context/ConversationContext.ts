@@ -32,6 +32,7 @@ export interface ConversationContextType {
   localIsLoading: boolean;
   localIsTyping: boolean;
   localError: string | null;
+  isPending: boolean; // React 19 useTransition state
 
   // Drag & Drop State
   draggedSlide: number | null;

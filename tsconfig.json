@@ -3,6 +3,7 @@
     "module": "commonjs",
     "target": "es6",
     "jsx": "react",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": true,

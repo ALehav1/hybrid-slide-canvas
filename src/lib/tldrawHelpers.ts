@@ -1,4 +1,18 @@
-import { type Editor, type TLShapePartial, createShapeId } from '@tldraw/tldraw';
+import { type Editor, type TLShapePartial, type TLShapeId } from '@tldraw/tldraw'
+import { createUniqueShapeId as createUniqueId } from './utils/clientId'
+
+/**
+ * Creates a unique shape ID prefixed with this client's instance ID to prevent
+ * collisions across multiple browser tabs/instances
+ * 
+ * This is safer than direct nanoid() casts as TLShapeId doesn't include client prefix
+ * 
+ * @deprecated Use createUniqueShapeId from clientId.ts instead
+ */
+export function createUniqueShapeId(): TLShapeId {
+  console.warn('Use clientId.createUniqueShapeId instead of tldrawHelpers.createUniqueShapeId')
+  return createUniqueId()
+}
 
 // Supported color tokens for shapes
 type ShapeColor = 'blue' | 'red' | 'green' | 'purple' | 'orange' | 'black' | 'gray' | 'none';
@@ -21,8 +35,9 @@ export function createSketchShape(
   if (!editor) return;
 
   // Determine anchor point for the shape's center
-  // Note: Using `editor.viewportPageBounds` as per TLDraw v3.13 API update.
-  // Linter may flag this if using older type definitions.
+  // Note: Using `editor.getViewportPageBounds()` as per TLDraw v3.13 API update.
+  // TODO: Remove this comment once @tldraw/tldraw ≥3.13 ships its updated d.ts
+  // Consider using editor.focusBounds() for automatic frame-aware positioning
   const viewport = editor.getViewportPageBounds();
   let cx = viewport.center.x;
   let cy = viewport.center.y;
@@ -56,7 +71,7 @@ export function createSketchShape(
 
   const w = opts.w ?? 120;
   const h = opts.h ?? 80;
-  const id = createShapeId();
+  const id = createUniqueShapeId();
 
   const geo: TLShapePartial = {
     id,
@@ -80,7 +95,7 @@ export function createSketchShape(
     let finalIdToSelect = id;
 
     if (opts.label) {
-      const textId = createShapeId();
+      const textId = createUniqueShapeId();
       editor.createShapes([
         {
           id: textId,
@@ -95,7 +110,7 @@ export function createSketchShape(
         },
       ]);
 
-      const groupId = createShapeId();
+      const groupId = createUniqueShapeId();
       editor.groupShapes([id, textId], { groupId });
       finalIdToSelect = groupId;
     }

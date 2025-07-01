@@ -12,6 +12,16 @@ vi.mock('@tldraw/tldraw', () => {
 });
 
 describe('theme', () => {
+  // Common mock editor for all tests
+  let mockEditor: any;
+  
+  beforeEach(() => {
+    // Create fresh mock editor before each test
+    mockEditor = {
+      setStyleForNextShapes: vi.fn(),
+    };
+  });
+  
   test('exports theme object with correct properties', () => {
     expect(theme).toBeDefined();
     expect(theme).toHaveProperty('backgroundColor', '#ffffff');
@@ -22,48 +32,30 @@ describe('theme', () => {
   });
 
   describe('applyTheme', () => {
-    let mockEditor: any;
-
-    beforeEach(() => {
-      // Create mock editor
-      mockEditor = {
-        setStyleForNextShapes: vi.fn(),
-      };
-    });
-
     test('applies correct styles to editor', () => {
       // Call the function with mock editor
       applyTheme(mockEditor);
       
-      // Check that it sets the correct styles
+      // Check that it sets the correct styles (anchored by arguments not call index)
       expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledTimes(4);
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(1, 'mockColorStyle', 'blue');
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(2, 'mockFillStyle', 'none');
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(3, 'mockDashStyle', 'draw');
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(4, 'mockSizeStyle', 's');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockColorStyle', 'blue');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockFillStyle', 'none');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockDashStyle', 'draw');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockSizeStyle', 's');
     });
   });
 
   describe('resetTheme', () => {
-    let mockEditor: any;
-
-    beforeEach(() => {
-      // Create mock editor
-      mockEditor = {
-        setStyleForNextShapes: vi.fn(),
-      };
-    });
-
     test('resets styles to default values', () => {
       // Call the function with mock editor
       resetTheme(mockEditor);
       
-      // Check that it sets the correct default styles
+      // Check that it sets the correct default styles (anchored by arguments not call index)
       expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledTimes(4);
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(1, 'mockColorStyle', 'black');
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(2, 'mockFillStyle', 'none');
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(3, 'mockDashStyle', 'draw');
-      expect(mockEditor.setStyleForNextShapes).toHaveBeenNthCalledWith(4, 'mockSizeStyle', 's');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockColorStyle', 'black');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockFillStyle', 'none');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockDashStyle', 'draw');
+      expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledWith('mockSizeStyle', 's');
     });
   });
 });
