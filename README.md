@@ -256,11 +256,23 @@ A critical architecture component is our unique shape ID generation strategy (im
    - Provides in-memory IndexedDB implementation
    - No configuration needed for individual tests
 
-2. **Testing Patterns**:
+2. **Zustand Store Testing Patterns**:
+   - **Actions Access**: Always use `slidesStore.getState().action()` pattern
+   - **Store Reset**: Use built-in `slidesStore.getState().reset()` method to preserve action methods
+   - **Type Safety**: Type stores as `StoreApi<StateInterface>` for method access
+   - **Hydration**: Await `slidesStore.persist?.rehydrate?.()` after actions for race-free assertions
+
+3. **Testing Patterns**:
    - Storage adapter tests verify read/write operations
    - Store tests confirm persistence behavior
    - Migration tests validate data evolution
    - All mocks centralized in `src/__tests__/test-utils/mocks/`
+
+4. **Common Testing Mistakes to Avoid**:
+   - ❌ **Never** use `setState(initialData, true)` for reset - erases action methods
+   - ❌ **Never** call actions directly on store object - causes TypeScript errors
+   - ✅ **Always** access actions via `getState()`: `store.getState().action()`
+   - ✅ **Always** use store's built-in `reset()` method for test cleanup
 
 ### Architecture Diagram
 
@@ -306,47 +318,123 @@ echo "VITE_OPENAI_API_KEY=sk-..." >> .env
 # run dev server
 pnpm dev
 # open http://localhost:5173
-📁 Project Structure
-```text
-src/
-├─ components/
-│  ├─ ConversationProvider.tsx   Centralized chat state and logic
-│  ├─ CanvasSlide.tsx          TLDraw wrapper with sketch rendering
-│  ├─ SlideManager.tsx         Slide navigation and management
-│  ├─ ErrorBoundary.tsx        Global error handling
-│  ├─ LibraryPanel.tsx         Shape library sidebar
-│  └─ Chat/
-│     ├─ ChatPanel.tsx         Chat UI and message handling
-│     ├─ ChatInterface.tsx     Message display and input components
-│     ├─ MessageList.tsx       Renders conversation history
-│     └─ aiActions.ts          Zod schema & handlers
-├─ hooks/
-│  ├─ useAppHandlers.ts        App-level event handlers
-│  ├─ useConversationContext.ts  Chat context consumer hook
-│  └─ useSlideOrchestration.ts   Slide management and orchestration
-├─ lib/
-│  ├─ tldrawHelpers.ts         createSketchShape(), group utilities
-│  ├─ theme.ts                 UI and canvas theme settings
-│  ├─ openaiClient.ts          OpenAI API integration
-│  ├─ shapeLibraries/
-│  │  ├─ basic.ts              Basic shapes (rectangles, circles, etc.)
-│  │  ├─ flowchart.ts          Flowchart specific shapes
-│  │  └─ diagrams.ts           Diagram components
-│  ├─ storage/
-│  │  └─ dexieStorage.ts       Zustand <-> Dexie adapter
-│  └─ utils/
-│     ├─ clientId.ts           createUniqueShapeId()
-│     ├─ deepFreeze.ts         dev-only immutability guard
-│     └─ logging.ts            Structured logging utilities
-├─ state/
-│  ├─ slidesStore.ts           Production store (immer + persist)
-│  ├─ slidesSelectors.ts       Memoized selectors for slides data
-│  └─ enhancedSlidesStore.ts   Experimental features
-├─ types/
-│  └─ app.ts                   Application-wide type definitions
-├─ __tests__/
-│  └─ test-utils/
-│     └─ mocks/                Centralized test mocks
+## 📁 Project Structure – 2025-07-01
+
+<details>
+<summary>Click to expand full tree</summary>
+
+
+hybrid-slide-canvas/
+├── public/                 # Static assets copied verbatim to /dist
+│   └── vite.svg
+└── src/
+    ├─ App.tsx              # Root layout: canvas + side-bars + thumbnail rail
+    ├─ main.tsx             # React 19 entry, mounts <App/>
+    │
+    ├─ components/          # Pure UI/interaction logic (no global state)
+    │   ├─ CanvasSlide.tsx          # TLDraw wrapper w/ Rough.js skin
+    │   ├─ LibraryPanel.tsx         # Shape library sidebar
+    │   ├─ ErrorBoundary.tsx        # Global <ErrorBoundary/>
+    │   ├─ ConversationProvider.tsx # Chat context provider
+    │   └─ Chat/
+    │       ├─ ChatPanel.tsx        # Chat UI shell + send button
+    │       ├─ aiActions.ts         # Zod schema -> canvas command map
+    │       └─ MessageList.tsx      # Virtualised scroll list
+    │
+    ├─ hooks/               # React hooks that orchestrate UI/state
+    │   ├─ useConversationContext.ts # Typed consumer for ConversationProvider
+    │   └─ useSlideOrchestration.ts  # Slide keyboard shortcuts & syncing
+    │
+    ├─ lib/
+    │   ├─ openaiClient.ts           # Thin OpenAI SDK wrapper
+    │   ├─ theme.ts                  # Central colour / stroke theme
+    │   ├─ tldrawHelpers.ts          # createSketchShape(), groupShapes(), …
+    │   ├─ utils/
+    │   │   ├─ clientId.ts           # createUniqueShapeId() w/ per-tab prefix
+    │   │   ├─ deepFreeze.ts         # DEV-only immutability guard
+    │   │   └─ logging.ts            # {debug,info,warn,error} → console
+    │   ├─ shapeLibraries/           # Declarative "insert-shape" catalogs
+    │   │   ├─ basic.ts              # Rect, ellipse, diamond …
+    │   │   └─ flowchart.ts          # Start/Process/Decision/End presets
+    │   └─ storage/                  # All IndexedDB glue
+    │       ├─ dexieStorage.ts       # Generic Zustand <-> Dexie adapter
+    │       └─ indexedDbMiddleware.ts# (experimental) streaming persistence
+    │
+    ├─ state/               # Global state stores (Zustand)
+    │   ├─ slidesStore.ts            # Production store (Immer + Dexie)
+    │   ├─ enhancedSlidesStore.ts    # Experimental store (split-table schema)
+    │   └─ slidesSelectors.ts        # Memoised selectors & handy hooks
+    │
+    ├─ styles/              # Tailwind/CSS reset + global tokens
+    │   └─ base.css
+    │
+    ├─ types/
+    │   └─ app.ts                     # Centralised shared types
+    │
+    ├─ __tests__/          # TESTS ONLY – mirrors src/ for easy discovery
+    │   ├─ state/
+    │   │   ├─ slidesStore-dexie.test.ts  # Persistence & Dexie mocking
+    │   │   └─ enhancedSlidesStore.test.ts
+    │   ├─ lib/
+    │   │   ├─ deepFreeze.test.ts
+    │   │   └─ tldrawHelpers.test.ts
+    │   ├─ components/
+    │   │   ├─ ChatPanel.test.tsx
+    │   │   └─ LibraryPanel.test.tsx
+    │   └─ test-utils/
+    │       └─ mocks/
+    │           ├─ dexie.ts           # 🔑 in-memory Dexie mock (tables + CRUD)
+    │           ├─ openaiClient.ts    # Prevents real network calls
+    │           └─ tldraw.ts          # Lightweight TLDraw stub
+    │
+    └─ setupTests.ts        # fake-indexeddb/auto + global beforeEach
+
+</details>
+
+
+🔍 What each top-level area does & why
+
+Layer / Dir	Purpose	Why it exists
+public/	Static files copied untouched by Vite.	Keepsfavicon, SVGs and will host exported slide thumbs.
+components/	Pure UI: no global state; props in, events out.	Makes components tree-shakable and story-book-ready.
+hooks/	Composable behaviour hooks.	Co-locates slide shortcuts, chat consumers, etc.
+lib/	All framework-agnostic helpers & adapters.	Enables re-use in Node scripts & tests.
+lib/storage/	IndexedDB glue (Dexie) + future migration helpers.	Abstracts persistence so stores stay clean.
+state/	Single-source Zustand stores + selectors.	Clear boundary between state shape and UI.
+styles/	Tailwind base + custom variables.	Keeps design tokens away from component logic.
+types/	Cross-cutting TypeScript types/enums.	Avoids import cycles and "shadow" types.
+__tests__/	Collocated test suites & reusable mocks.	"Tests live next to code" philosophy for DX.
+setupTests.ts	Global Vitest bootstrap: fake-indexeddb, console spies, etc.	Guarantees a hermetic test env, zero db/file leakage.
+
+
+⸻
+
+🗺️ Directory Narratives
+
+components/
+	•	CanvasSlide.tsx – Boots a TLDraw 3 <Tldraw> instance, injects Rough.js sketch style, and exposes onEditorMount so external panels (chat) can drive the canvas.
+	•	Chat/ChatPanel.tsx – Sidebar chat UI; dispatches user text → ConversationProvider, shows loader / error state.
+	•	Chat/aiActions.ts – Zod schema that whitelists only the JSON commands the AI is allowed to execute (security gate) and maps them to TLDraw helper callbacks.
+	•	LibraryPanel.tsx – Renders the shape libraries declared in lib/shapeLibraries/, handles drag-to-canvas soon™.
+
+state/
+	•	slidesStore.ts – Production-ready store that most components consume. Uses Immer for ergonomic draft mutating, deepFreeze() in dev, and Dexie via createJSONStorage for ~unlimited slide data.
+	•	enhancedSlidesStore.ts – Playground for future "split tables" persistence where thumbnails / metadata live separate from heavy JSON blobs. Exists behind a feature-flag.
+	•	slidesSelectors.ts – All read-only selectors (pure functions) + React wrappers (useSlides(...), useAdjacentSlides(...)). Components never touch raw store state.
+
+lib/utils/
+	•	clientId.ts – Generates a per-browser-tab cid_ab12 prefix via localStorage. Every shape id becomes cid_ab12-x7y8z9w0 → zero collisions in multi-user future.
+	•	deepFreeze.ts – DEV-only; walks objects with a WeakSet to avoid cycles; freezes symbol keys; bails in prod to save ~3 ms on large payloads.
+	•	logging.ts – Thin wrapper over console.* so we can later swap for Sentry or Echo.
+
+lib/storage/
+	•	dexieStorage.ts – Factory that returns an object matching Zustand's StateStorage interface but backed by Dexie (IndexedDB). Adds prefixing, error handling & schema upgrades.
+	•	indexedDbMiddleware.ts – (Experimental) stream-writes large JSON blobs in chunks to avoid UI jank; currently used only by enhancedSlidesStore.
+
+__tests__/test-utils/mocks/
+	•	dexie.ts – Critical mock: instantiates an in-memory MockDexie with a real-looking zustandStore table so persistence middleware doesn't crash.
+	•	openaiClient.ts – Replaces network calls with vi.fn()s returning canned responses; lets chat tests run offline.
+	•	tldraw.ts – Lightweight TLDraw stub exposing only createShapes, select, etc., for shape-creation unit tests.
 ├─ styles/
 │  └─ App.css                 Global styles and CSS variables
 ├─ App.tsx                    Application layout and composition
@@ -457,6 +545,18 @@ pnpm test:ui
 ```
 
 ## Recent Changes
+
+### 2025-07-01 — Zustand Store Testing & Reset Method Fixes
+
+- **Store Reset Method**: Fixed critical bug where `reset()` method used `setState(initialState, true)` pattern that erased all action methods
+- **Testing Patterns**: Established canonical patterns for Zustand store testing:
+  - Always use `slidesStore.getState().action()` for action calls
+  - Always use `slidesStore.getState().reset()` for test cleanup
+  - Type stores as `StoreApi<StateInterface>` for proper method access
+  - Await `persist?.rehydrate?.()` after actions for race-free assertions
+- **Test Infrastructure**: Removed obsolete test utilities that used problematic `setState(initialData, true)` pattern
+- **Editor API Fixes**: Fixed TypeScript errors in `editor.select()` calls by ensuring flat array parameters
+- **100% Test Coverage**: All 12 slidesStore Dexie persistence tests now pass with stable, reliable patterns
 
 ### 2025-06-30 — State Management & Type-Safety Improvements
 

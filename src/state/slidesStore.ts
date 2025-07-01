@@ -53,18 +53,18 @@ export interface SlidesStateData {
    4.  Dexie-based Zustand storage adapter  (✨ extract to "@/lib/storage")
    =========================================================================== */
 class HybridDB extends Dexie {
-  zustand!: Dexie.Table<{ id: string; value: string }, string>
+  zustandStore!: Dexie.Table<{ id: string; value: string }, string>
   constructor() {
     super('hybrid-slide-canvas')
-    this.version(1).stores({ zustand: 'id' })
+    this.version(1).stores({ zustandStore: 'id' })
   }
 }
 const db = new HybridDB()
 
 const dexieStorage: StateStorage = {
-  getItem: async (key) => (await db.zustand.get(key))?.value ?? null,
-  setItem: async (key, val) => db.zustand.put({ id: key, value: val }),
-  removeItem: async (key) => db.zustand.delete(key),
+  getItem: async (key) => (await db.zustandStore.get(key))?.value ?? null,
+  setItem: async (key, val) => db.zustandStore.put({ id: key, value: val }),
+  removeItem: async (key) => db.zustandStore.delete(key),
 }
 
 /* ===========================================================================
@@ -108,7 +108,7 @@ const logic = (set: any, get: any): SlidesState => ({
     set((draft: Draft<SlidesState>) => {
       const idx = draft.slides.length + 1
       const id = `slide-${nanoid(8)}`
-      const frameId = createUniqueShapeId()
+      const frameId = createUniqueShapeId() as TLShapeId
 
       draft.slides.push({
         ...makeInitialSlide(id),
@@ -128,7 +128,6 @@ const logic = (set: any, get: any): SlidesState => ({
         },
       ])
 
-      // TLDraw expects an array of IDs
       editor?.select?.(frameId)
     }),
 
@@ -148,7 +147,9 @@ const logic = (set: any, get: any): SlidesState => ({
       if (!draft.slides.some((s) => s.id === id)) return
       draft.currentSlideId = id
       const slide = draft.slides.find((s) => s.id === id)!
-      editor?.select?.(slide.frameId)
+      if (slide.frameId) {
+        editor?.select?.([slide.frameId] as any)
+      }
     }),
 
   reorderSlides: (from, to) =>
@@ -163,7 +164,7 @@ const logic = (set: any, get: any): SlidesState => ({
       const src = draft.slides.find((s) => s.id === slideId)
       if (!src) return
       const id = `slide-${nanoid(8)}`
-      const frameId = createUniqueShapeId()
+      const frameId = createUniqueShapeId() as TLShapeId
       const insertAt = draft.slides.findIndex((s) => s.id === slideId) + 1
       draft.slides.splice(insertAt, 0, {
         ...src,
@@ -197,7 +198,7 @@ const logic = (set: any, get: any): SlidesState => ({
       s.updatedAt = new Date()
     }),
 
-  reset: () => set(structuredClone(initialState), true),
+  reset: () => set((state: SlidesState) => ({ ...state, ...structuredClone(initialState) })),
 })
 
 /* ===========================================================================

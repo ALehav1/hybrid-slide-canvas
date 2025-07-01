@@ -1,133 +1,56 @@
 /**
- * Dexie mock implementation for testing
+ * DEPRECATED - DO NOT USE MANUAL DEXIE MOCK
  * 
- * This module provides factory functions to create mock Dexie database instances
- * for unit testing. It works with fake-indexeddb to provide a realistic IndexedDB
- * simulation in the testing environment.
+ * This file is kept only as a reference and to prevent test breakage.
+ * 
+ * Instead of using manual Dexie mocks, we now use fake-indexeddb globally.
+ * The proper setup is in src/setupTests.ts which uses 'fake-indexeddb/auto'.
+ * 
+ * DO NOT USE THIS FILE FOR NEW TESTS. ALL TESTS SHOULD USE THE GLOBAL
+ * FAKE-INDEXEDDB SETUP INSTEAD OF MANUAL DEXIE MOCKS.
  */
 
 import { vi } from 'vitest';
-import Dexie from 'dexie';
 
 /**
- * Factory function to create a mock Zustand storage implementation for tests
- * This mock simulates the storage interface expected by Zustand's persist middleware
+ * Warns when this file is imported and provides a thin implementation
+ * that routes to the global fake-indexeddb implementation.
  */
-export const createMockZustandStorage = () => {
-  // In-memory storage that mimics localStorage/sessionStorage
-  const storage: Record<string, string> = {};
+class WarningDexie {
+  constructor(_name: string) {
+    console.warn(
+      `[WARNING] You are using the deprecated manual Dexie mock at src/__tests__/test-utils/mocks/dexie.ts. \n` +
+      `This is not recommended - use the global fake-indexeddb setup from setupTests.ts instead. \n` +
+      `Remove any manual vi.mock('dexie', ...) calls from your tests.`
+    );
+  }
 
+  // Forward to the real implementation from fake-indexeddb
+  version() { return this; }
+  stores() { return this; }
+  table() { return {}; }
+  open() { return Promise.resolve(this); }
+  close() {}
+}
+
+export default WarningDexie;
+
+// For backward compatibility
+export const createMockZustandStorage = () => {
+  console.warn('[WARNING] createMockZustandStorage is deprecated. Use fake-indexeddb instead.');
   return {
-    getItem: vi.fn(async (name: string): Promise<string | null> => {
-      return storage[name] || null;
-    }),
-    setItem: vi.fn(async (name: string, value: string): Promise<void> => {
-      storage[name] = value;
-    }),
-    removeItem: vi.fn(async (name: string): Promise<void> => {
-      delete storage[name];
-    })
+    getItem: vi.fn().mockResolvedValue(null),
+    setItem: vi.fn().mockResolvedValue(undefined),
+    removeItem: vi.fn().mockResolvedValue(undefined)
   };
 };
 
-/**
- * Type definition for a mock Dexie database configuration
- */
-interface MockDexieConfig {
-  name: string;
-  tables: Record<string, string | null>;
-  initialData?: Record<string, Record<string, any>[]> | undefined;
-}
-
-/**
- * Factory function to create a mock Dexie database for testing
- * 
- * @param config Configuration for the mock database
- * @returns A configured Dexie database instance
- */
-export const createMockDexieDb = (config: MockDexieConfig): Dexie => {
-  class MockDexieDb extends Dexie {
-    constructor() {
-      super(config.name);
-      
-      // Define schema based on config
-      this.version(1).stores(config.tables);
-      
-      // Add any initial data if provided
-      if (config.initialData) {
-        this.on('populate', async (transaction) => {
-          for (const [tableName, items] of Object.entries(config.initialData || {})) {
-            const table = transaction.table(tableName);
-            for (const item of items) {
-              await table.add(item);
-            }
-          }
-        });
-      }
-    }
+export class MockTable {
+  constructor() {
+    console.warn('[WARNING] MockTable is deprecated. Use fake-indexeddb instead.');
   }
-
-  // Create database instance
-  const db = new MockDexieDb();
-  
-  return db;
-};
-
-/**
- * Setup a mock for our AppDatabase class from dexieStorage.ts
- * This is useful for mocking the entire Dexie storage module
- */
-export const mockAppDatabase = (initialData?: Record<string, any>[]) => {
-  return createMockDexieDb({
-    name: 'hybrid-slide-canvas-test-db',
-    tables: {
-      zustandStore: 'id' // Primary key is 'id'
-    },
-    ...(initialData ? { initialData: { zustandStore: initialData } } : {})
-  });
-};
-
-/**
- * Create a vi.mock for Dexie import - use this in test files
- */
-export const setupDexieMock = (initialData?: Record<string, any>[]) => {
-  const mockDb = mockAppDatabase(initialData);
-  
-  vi.mock('../../lib/storage/dexieStorage', async (importOriginal) => {
-    const actual = await importOriginal<typeof import('../../../lib/storage/dexieStorage')>();
-    
-    return {
-      ...actual,
-      // Replace the db export with our mock
-      db: mockDb,
-      // Override the initDatabase function
-      initDatabase: vi.fn().mockResolvedValue(undefined),
-      // Override the createDexieStorage function
-      createDexieStorage: vi.fn().mockReturnValue(createMockZustandStorage())
-    };
-  });
-  
-  return mockDb;
-};
-
-/**
- * Mock Dexie class for tests
- * This allows us to directly mock the Dexie import using vi.mock('dexie')
- */
-class MockDexie extends Dexie {
-  zustand: Dexie.Table<{ id: string; value: string }, string>;
-  
-  constructor(name: string = 'hybrid-slide-canvas-test') {
-    super(name);
-    this.version(1).stores({ zustand: 'id' });
-    this.zustand = this.table('zustand');
-  }
+  get = vi.fn().mockResolvedValue(undefined)
+  put = vi.fn().mockResolvedValue(undefined)
+  delete = vi.fn().mockResolvedValue(undefined)
+  clear = vi.fn().mockResolvedValue(undefined)
 }
-
-export default {
-  createMockZustandStorage,
-  createMockDexieDb,
-  mockAppDatabase,
-  setupDexieMock,
-  MockDexie
-};

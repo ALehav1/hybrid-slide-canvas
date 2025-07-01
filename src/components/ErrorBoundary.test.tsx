@@ -16,13 +16,17 @@ vi.mock('../lib/utils/logging', () => ({
 // Import after mocking
 import { logger } from '../lib/utils/logging';
 
-// Create a component that throws an error
-const ThrowError = ({ shouldThrow = true }) => {
+// Create a component that throws an error with proper typing
+const ThrowError: React.FC<{ shouldThrow?: boolean }> = ({ shouldThrow = true }) => {
   if (shouldThrow) {
-    throw new Error('Test error');
+    // Use a deterministic error object that can be referenced elsewhere
+    throw boundaryError;
   }
   return <div>No Error</div>;
 };
+
+// Define a deterministic error object for stricter assertions
+const boundaryError = new Error('Test error');
 
 describe('ErrorBoundary', () => {
   // Suppress React's error logging during tests
@@ -38,11 +42,7 @@ describe('ErrorBoundary', () => {
   });
 
   test('renders children when no error occurs', () => {
-    render(
-      <ErrorBoundary>
-        <div data-testid="test-child">Test Content</div>
-      </ErrorBoundary>
-    );
+    renderWithErrorBoundary(<div data-testid="test-child">Test Content</div>);
 
     const child = screen.getByTestId('test-child');
     expect(child).toBeInTheDocument();
@@ -52,17 +52,15 @@ describe('ErrorBoundary', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  // Helper function to render components wrapped in ErrorBoundary
+  const renderWithErrorBoundary = (ui: React.ReactNode) => {
+    return render(<ErrorBoundary>{ui}</ErrorBoundary>);
+  };
+
   test('renders fallback UI when error occurs', () => {
-    // We need to suppress the error boundary warning in the test
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    
     // Using try-catch because error boundaries only catch errors during rendering
     try {
-      render(
-        <ErrorBoundary>
-          <ThrowError />
-        </ErrorBoundary>
-      );
+      renderWithErrorBoundary(<ThrowError />);
     } catch (error) {
       // Error boundary will catch the error in real usage
     }
@@ -77,21 +75,17 @@ describe('ErrorBoundary', () => {
     const details = screen.getByText('Error Details');
     expect(details).toBeInTheDocument();
     
-    // Verify logger was called with error
+    // Verify logger was called with the specific error instance
     expect(logger.error).toHaveBeenCalledWith(
       'Caught by Error Boundary:',
       expect.objectContaining({
-        error: expect.any(Error),
+        error: boundaryError,
       })
     );
   });
 
   test('does not render fallback UI when shouldThrow is false', () => {
-    render(
-      <ErrorBoundary>
-        <ThrowError shouldThrow={false} />
-      </ErrorBoundary>
-    );
+    renderWithErrorBoundary(<ThrowError shouldThrow={false} />);
 
     // Check that the component renders normally
     expect(screen.getByText('No Error')).toBeInTheDocument();
