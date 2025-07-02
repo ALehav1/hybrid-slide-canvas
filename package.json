@@ -13,7 +13,10 @@
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:tokens": "node build-tokens.mjs",
+    "predev": "npm run build:tokens",
+    "prebuild": "npm run build:tokens"
   },
   "dependencies": {
     "@tldraw/tldraw": "^3.13.2",
@@ -53,6 +56,8 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
     "vite": "^5.3.1",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+    "tailwindcss": "^3.4.4",
+    "autoprefixer": "^10.4.19"
   }
 }

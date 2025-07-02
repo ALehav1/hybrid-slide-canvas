@@ -9,8 +9,13 @@
     "strict": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
+  "include": ["src/**/*", "src/__tests__/**/*"],
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },

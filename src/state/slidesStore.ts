@@ -241,5 +241,8 @@ const store = create<SlidesState>()(
   ),
 )
 
+export const useSlidesStore = store
+export const slidesStore = store // For tests and direct access
+
 /* eslint-disable-next-line import/no-default-export */
 export default store

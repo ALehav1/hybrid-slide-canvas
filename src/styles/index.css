@@ -1,4 +1,9 @@
-/* ========== GLOBAL STYLES ========== */
+/* ========== TAILWIND CSS DIRECTIVES ========== */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========== DESIGN TOKENS & GLOBAL STYLES ========== */
 :root {
   /* Color Palette */
   --color-primary: #007acc; /* Updated to match user's preferred blue */

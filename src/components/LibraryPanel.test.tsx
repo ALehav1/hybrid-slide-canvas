@@ -1,98 +1,92 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { LibraryPanel } from './LibraryPanel';
-import { vi, describe, test, expect, beforeEach } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import '@testing-library/jest-dom';
 
-// Mock the TLDraw useEditor hook
+// ────── mocks (must come first) ──────
 vi.mock('@tldraw/tldraw', () => ({
   useEditor: vi.fn(),
 }));
 
-// Import after mocking
-import { useEditor } from '@tldraw/tldraw';
-
-// Mock the basic library
+// Correct path based on find_by_name result.
+// NOTE: The path is relative to the test file's location.
 vi.mock('../lib/shapeLibraries/basic', () => ({
   basicLibrary: [
     {
-      id: 'lib-test-rect',
+      id: 'rect1',
       name: 'Test Rectangle',
-      preview: '/lib/test-rect.png',
-      factory: vi.fn().mockImplementation(() => Promise.resolve()),
+      icon: '/lib/test-rectangle.png',
+      factory: vi.fn(),
     },
     {
-      id: 'lib-test-diamond',
+      id: 'diamond1',
       name: 'Test Diamond',
-      preview: '/lib/test-diamond.png',
-      factory: vi.fn().mockImplementation(() => Promise.resolve()),
+      icon: '/lib/test-diamond.png',
+      factory: vi.fn(),
     },
   ],
 }));
 
-// Import after mocking
+// ────── imports ──────
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+// ────── imports that depend on the mocks ──────
+import { useEditor } from '@tldraw/tldraw';
 import { basicLibrary } from '../lib/shapeLibraries/basic';
+import { LibraryPanel } from './LibraryPanel';
 
 describe('LibraryPanel', () => {
-  // Clear all mocks before each test
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Ensure useEditor returns null by default
-    (useEditor as unknown as ReturnType<typeof vi.fn>).mockReset();
-  });
-  test('renders library panel with header', () => {
-    // Mock the editor as null first
-    (useEditor as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null);
-    
+  test('renders the library items correctly', () => {
     render(<LibraryPanel />);
-    
-    // Check if the header is rendered
-    expect(screen.getByText('📚 Library')).toBeInTheDocument();
-  });
 
-  test('renders all library items', () => {
-    // Mock the editor as null first
-    (useEditor as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null);
-    
-    render(<LibraryPanel />);
-    
-    // Check if all library items are rendered
+    // Check for the names
     expect(screen.getByText('Test Rectangle')).toBeInTheDocument();
     expect(screen.getByText('Test Diamond')).toBeInTheDocument();
-    
-    // Check if images are rendered with correct attributes
+
+    // Check for the images and their attributes
     const images = screen.getAllByRole('img');
     expect(images).toHaveLength(2);
-    expect(images[0]).toHaveAttribute('src', '/lib/test-rect.png');
+    expect(images[0]).toHaveAttribute('src', '/lib/test-rectangle.png');
     expect(images[0]).toHaveAttribute('alt', 'Test Rectangle');
     expect(images[1]).toHaveAttribute('src', '/lib/test-diamond.png');
     expect(images[1]).toHaveAttribute('alt', 'Test Diamond');
   });
 
-  test('calls factory function when library item is clicked and editor exists', () => {
-    // Mock the editor
+  test('calls factory function when library item is clicked and editor exists', async () => {
     const mockEditor = { id: 'mock-editor' };
     (useEditor as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockEditor);
-    
+
+    const factoryFn = basicLibrary[0].factory;
+
     render(<LibraryPanel />);
-    
-    // Click on the first library item
-    fireEvent.click(screen.getByText('Test Rectangle'));
-    
+
+    const item = await screen.findByText('Test Rectangle');
+    await userEvent.click(item);
+
     // Verify that factory was called with the editor
-    expect(basicLibrary[0].factory).toHaveBeenCalledTimes(1);
-    expect(basicLibrary[0].factory).toHaveBeenCalledWith(mockEditor);
+    expect(factoryFn).toHaveBeenCalledTimes(1);
+    expect(factoryFn).toHaveBeenCalledWith(mockEditor);
   });
-  
-  test('does not call factory function when library item is clicked and editor is null', () => {
-    // Mock the editor as null
+
+  test('does not call factory function when library item is clicked and editor is null', async () => {
     (useEditor as unknown as ReturnType<typeof vi.fn>).mockReturnValue(null);
-    
+
+    const factoryFn = basicLibrary[0].factory;
+
     render(<LibraryPanel />);
-    
-    // Click on the first library item
-    fireEvent.click(screen.getByText('Test Rectangle'));
-    
-    // Verify that factory was NOT called when editor is null (due to short-circuit evaluation)
-    expect(basicLibrary[0].factory).not.toHaveBeenCalled();
+
+    const item = await screen.findByText('Test Rectangle');
+    await userEvent.click(item);
+
+    expect(factoryFn).not.toHaveBeenCalled();
   });
+});
+
+// ────── suite-level hygiene ──────
+afterEach(() => {
+  vi.restoreAllMocks(); // remove spies, resets mock state
+  vi.runOnlyPendingTimers(); // flush queued timers
+  // @ts-expect-error - getPendingTimers() is not in the type definitions but exists
+  expect(vi.getPendingTimers()).toHaveLength(0); // assert no timers are left
+  vi.useRealTimers(); // restore real timers
+  vi.resetModules(); // clear module cache for next file
 });

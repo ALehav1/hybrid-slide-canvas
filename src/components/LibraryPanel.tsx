@@ -1,13 +1,16 @@
 import { useState, useCallback, useTransition } from "react";
 import { basicLibrary } from "../lib/shapeLibraries/basic";
-import { useEditor } from "@tldraw/tldraw";
+import type { Editor } from "@tldraw/tldraw";
+
+type LibraryPanelProps = {
+  editor: Editor | null;
+};
 
 /**
  * Library panel component that displays available shapes and templates
  * Enhanced with React 19 patterns for better UX during shape creation
  */
-export const LibraryPanel = () => {
-  const editor = useEditor();
+export const LibraryPanel = ({ editor }: LibraryPanelProps) => {
   // Track the last clicked item for better UX feedback
   const [lastClickedItemId, setLastClickedItemId] = useState<string | null>(null);
   // Use transition to prevent UI blocking during shape creation

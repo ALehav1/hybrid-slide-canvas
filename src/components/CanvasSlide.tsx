@@ -1,5 +1,5 @@
-import { type ReactNode, Suspense } from 'react';
-import { Tldraw, type Editor } from '@tldraw/tldraw';
+import { Suspense } from 'react';
+import { Tldraw, type Editor, type TLComponents } from '@tldraw/tldraw';
 import { applyTheme } from '../lib/theme';
 
 // Loading fallback component for TLDraw canvas
@@ -14,14 +14,25 @@ const CanvasLoadingFallback = () => (
 
 type Props = {
   slideId: string;
-  children?: ReactNode;
   onEditorMount: (editor: Editor) => void;
+  className?: string;
+};
+
+// Custom TLDraw components for UI injection
+const customComponents: Partial<TLComponents> = {
+  InFrontOfTheCanvas: () => (
+    <div className="absolute top-4 left-4 z-10">
+      {/* Future: Guides, rulers, custom overlays */}
+    </div>
+  ),
+  // Future: Custom toolbar, style panels, etc.
 };
 
 /**
  * Canvas slide component that renders a TLDraw canvas with proper error handling and lazy loading
+ * Uses TLDraw's official components API instead of children for UI customization
  */
-export const CanvasSlide: React.FC<Props> = ({ slideId, children, onEditorMount }) => {
+export const CanvasSlide: React.FC<Props> = ({ slideId, onEditorMount, className = '' }) => {
   // Use React 19's Suspense for async loading of the canvas
   return (
     <Suspense fallback={<CanvasLoadingFallback />}>
@@ -37,10 +48,9 @@ export const CanvasSlide: React.FC<Props> = ({ slideId, children, onEditorMount 
           }
         }}
         hideUi
-        className="h-full w-full"
-      >
-        {children}
-      </Tldraw>
+        className={`h-full w-full ${className}`}
+        components={customComponents}
+      />
     </Suspense>
   );
 };

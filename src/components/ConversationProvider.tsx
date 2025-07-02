@@ -9,7 +9,9 @@ import { logger } from '../lib/utils/logging';
 import { openai } from '../lib/openaiClient';
 import { type AiAction, AiActionSchema } from './Chat/aiActions';
 import { ErrorBoundary } from './ErrorBoundary';
-import conversationStore, { CONVERSATION_STORE_KEY } from '../lib/storage/conversationStorage';
+import conversationStore, { CONVERSATION_STORE_KEY, type ConversationState } from '../lib/storage/conversationStorage';
+
+
 
 const SLIDE_ID_REGEX = /^slide-[\w-]+$/;
 const MAX_MESSAGE_LENGTH = 10000;
@@ -69,12 +71,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
 
   // --- State Persistence ---
   
-  // Initialize the conversation storage
-  useEffect(() => {
-    conversationStore.init().catch(error => {
-      logger.error('Failed to initialize conversation storage', error);
-    });
-  }, []); // Empty dependency array ensures this runs only once on mount
+
 
   // Load state from Dexie on initial render
   useEffect(() => {
@@ -85,9 +82,9 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
         // Set loading state during initialization
         setStorageIsLoading(true);
         
-        const savedState = await conversationStore.getItem(CONVERSATION_STORE_KEY);
-        if (savedState && isMounted) {
-          const { conversations, isChatExpanded } = JSON.parse(savedState);
+        const savedData = await conversationStore!.getItem(CONVERSATION_STORE_KEY);
+        if (savedData && isMounted) {
+          const { conversations, isChatExpanded } = savedData.state;
           if (conversations) {
             conversationsRef.current = new Map(conversations);
             setConversationVersion((v) => v + 1); // Force re-render
@@ -97,6 +94,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
           }
           logger.debug('Loaded conversation state from Dexie storage');
         }
+        setStorageIsLoading(false);
       } catch (error) {
         logger.error('Failed to load conversation state from Dexie', error);
       } finally {
@@ -116,12 +114,12 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   // Save state to Dexie whenever it changes
   useEffect(() => {
     const saveState = async () => {
+      const stateToSave: ConversationState = {
+        conversations: Array.from(conversationsRef.current.entries()),
+        isChatExpanded,
+      };
       try {
-        const stateToSave = {
-          conversations: Array.from(conversationsRef.current.entries()),
-          isChatExpanded,
-        };
-        await conversationStore.setItem(CONVERSATION_STORE_KEY, JSON.stringify(stateToSave));
+        await conversationStore!.setItem(CONVERSATION_STORE_KEY, { state: stateToSave });
         logger.debug('Saved conversation state to Dexie storage');
       } catch (error) {
         logger.error('Failed to save conversation state to Dexie', error);
@@ -255,8 +253,8 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     const conversation = conversations.get(slideId)!;
     return [...conversation.messages]; // Return copy to prevent mutations
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationVersion]); 
-  
+  }, [conversationVersion, storageIsLoading]); 
+
   const getAllConversations = useCallback((): SlideConversation[] => {
     return Array.from(conversationsRef.current.values());
   }, []); 
@@ -446,6 +444,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     setShowSlideNavigator,
     setSlideNumberInput,
     setLocalIsLoading,
+    setStorageIsLoading,
     setLocalIsTyping,
     setLocalError,
     setDraggedSlide,

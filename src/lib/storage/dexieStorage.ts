@@ -12,7 +12,7 @@
  */
 
 import Dexie from 'dexie';
-import { createJSONStorage } from 'zustand/middleware';
+import { createJSONStorage, type StorageValue } from 'zustand/middleware';
 import { logger } from '../utils/logging';
 
 // Create our Dexie database with schema
@@ -78,8 +78,8 @@ export const initDatabase = async (): Promise<void> => {
  * @param options Configuration options
  * @returns Storage object compatible with Zustand's persist middleware
  */
-export const createDexieStorage = (options?: { 
-  name?: string; 
+export const createDexieStorage = <T>(options?: {
+  name?: string;
   errorHandler?: (error: Error) => void;
   initializeDb?: boolean;
 }) => {
@@ -94,7 +94,7 @@ export const createDexieStorage = (options?: {
   }
   
   // Create JSON storage using Dexie
-  return createJSONStorage(() => ({
+  return createJSONStorage<T>(() => ({
     getItem: async (name: string): Promise<string | null> => {
       try {
         const id = `${storeName}:${name}`;

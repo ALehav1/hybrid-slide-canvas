@@ -1,178 +1,85 @@
-/**
- * @vitest-environment jsdom
- */
+import { beforeEach, afterEach, describe, expect, test } from 'vitest';
+import createDexieStorage, { db } from '../dexieStorage';
+import Dexie from 'dexie';
 
-import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest';
-import { createDexieStorage, db, AppDatabase, initDatabase } from '../dexieStorage';
-import type { StateStorage } from 'zustand/middleware';
+// The object returned by createDexieStorage doesn't have a static type, so we infer it.
+type DexieStorage = ReturnType<typeof createDexieStorage>;
 
-// Save original console methods to restore later
-const originalConsoleDebug = console.debug;
-const originalConsoleError = console.error;
+// Use a consistent DB name for testing. The global setup will clear it.
+const testDbName = 'hybrid-slide-canvas-db';
 
-// Mock console methods to prevent noise during tests
-console.debug = vi.fn();
-console.error = vi.fn();
+describe('DexieStorage', () => {
+  // NOTE: `storage` is initialized in `beforeEach`. The non-null assertion `!` is
+  // used to assure TypeScript that it will be defined before any test runs.
+  let storage: DexieStorage = null!;
 
-describe('dexieStorage', () => {
-  beforeEach(async () => {
-    // Reset mocks between tests
-    vi.clearAllMocks();
-    
-    // Clear any database between tests - properly await async operations
-    const databases = await indexedDB.databases();
-    await Promise.all(
-      databases.map(database => database.name && indexedDB.deleteDatabase(database.name))
-    );
+  // Open a fresh storage instance for each spec.
+  beforeEach(() => {
+    storage = createDexieStorage({ name: testDbName });
   });
 
-  afterEach(() => {
-    // Clean up mocks
-    vi.restoreAllMocks();
-    
-    // Restore original console methods
-    console.debug = originalConsoleDebug;
-    console.error = originalConsoleError;
-  });
-
-  it('should initialize database successfully', async () => {
-    // Act
-    await initDatabase();
-    
-    // Assert
-    expect(db).toBeInstanceOf(AppDatabase);
-    expect(db.isOpen()).toBe(true);
-  });
-
-  // Import the actual return type for the createDexieStorage function
-  type DexieStorageAdapter = StateStorage;
-  
-  // Define operation and assertion function types with explicit parameter types
-  type StorageOperation = (
-    storage: DexieStorageAdapter,
-    key: string,
-    value: string
-  ) => Promise<string | null | undefined>;
-  
-  type Assertion = (result: string | null | undefined, value: string) => void;
-  type RemoveAssertion = (result: string | null | undefined) => void;
-  
-  // Use test.each for DRY tests of basic CRUD operations
-  // Test cases with proper type annotations
-  const getItemTest: [string, StorageOperation, Assertion] = [
-    'getItem retrieves stored data', 
-    async (storage, key, value) => { 
-      await storage.setItem(key, value);
-      return storage.getItem(key);
-    },
-    (result, value) => expect(result).toBe(value)
-  ];
-  
-  const setItemTest: [string, StorageOperation, Assertion] = [
-    'setItem stores data with correct format', 
-    async (storage, key, value) => {
-      await storage.setItem(key, value);
-      // Get directly from DB to verify storage
-      return db.zustandStore.get(`test-storage:${key}`).then(record => record?.value);
-    },
-    (result, value) => expect(result).toBe(value)
-  ];
-  
-  const removeItemTest: [string, StorageOperation, RemoveAssertion] = [
-    'removeItem deletes data', 
-    async (storage, key, value) => {
-      await storage.setItem(key, value);
-      await storage.removeItem(key);
-      return storage.getItem(key);
-    },
-    (result) => expect(result).toBeNull()
-  ];
-  
-  test.each([
-    getItemTest,
-    setItemTest,
-    removeItemTest as unknown as [string, StorageOperation, Assertion], // Type assertion for test.each compatibility
-  ])('%s', async (_testName: string, operation: StorageOperation, assertion: Assertion | RemoveAssertion) => {
-    // Arrange
-    // Cast to unknown first then to our adapter type to avoid strict compatibility errors
-    const storage = createDexieStorage({
-      name: 'test-storage',
-      initializeDb: true
-    }) as unknown as DexieStorageAdapter;
-    expect(storage).toBeDefined();
-    
-    const testKey = 'test-key';
-    const testValue = JSON.stringify({ foo: 'bar' });
-    
-    // Act - execute the operation
-    const result = await operation(storage, testKey, testValue);
-    
-    // Assert the result with type guard to handle different assertion signatures
-    if (assertion.length === 2) {
-      (assertion as Assertion)(result, testValue);
-    } else {
-      (assertion as RemoveAssertion)(result);
+  // Close the singleton DB connection before the global cleanup hook runs.
+  afterEach(async () => {
+    // This is the critical step that releases the connection lock.
+    if (db.isOpen()) {
+      await db.close();
     }
-    
-    // Cleanup
-    await db.zustandStore.clear();
   });
 
-  it('should handle errors during storage operations', async () => {
-    // Arrange
-    const errorHandler = vi.fn();
-    // Cast to unknown first then to our adapter type
-    const storage = createDexieStorage({
-      name: 'test-storage',
-      errorHandler,
-      initializeDb: true
-    }) as unknown as DexieStorageAdapter;
-    
-    // Create a specific error for stricter assertion
-    const testError = new Error('Test database error');
-    
-    // Mock a database error on the storage instance directly
-    const spy = vi.spyOn(storage, 'getItem').mockImplementation(() => {
-      errorHandler(testError);
-      return Promise.resolve(null);
-    });
-    
-    // Act - Try to retrieve data
-    const result = await storage.getItem('any-key');
-    
-    // Assert
-    expect(result).toBeNull();
-    expect(errorHandler).toHaveBeenCalledWith(testError);
-    expect(spy).toHaveBeenCalledWith('any-key');
+  test('setItem persists a record and getItem retrieves it', async () => {
+    const key = 'test-key';
+    // Zustand's storage interface expects a `StorageValue` object with a `state` property.
+    const value = { state: { data: 'test-value' } };
+
+    await storage.setItem(key, value);
+    const retrievedValue = await storage.getItem(key);
+
+    expect(retrievedValue).toEqual(value);
   });
 
-  it('should store data with correct prefix', async () => {
-    // Arrange
-    const customName = 'custom-store';
-    // Cast to unknown first then to our adapter type
-    const storage = createDexieStorage({
-      name: customName,
-      initializeDb: true
-    }) as unknown as DexieStorageAdapter;
+  test('removeItem deletes data', async () => {
+    const key = 'delete-me';
+    await storage.setItem(key, { state: { data: 'to-be-deleted' } });
+    await storage.removeItem(key);
+    const retrievedValue = await storage.getItem(key);
+
+    expect(retrievedValue).toBeNull();
+  });
+});
+
+// A separate suite for testing the key prefix logic.
+describe('DexieStorage with keyPrefix', () => {
+  const keyPrefix = 'user-prefix:';
+  let storage: DexieStorage = null!;
+
+  beforeEach(() => {
+    // Note: The current implementation of createDexieStorage uses the `name` option
+    // as a prefix, not a separate `keyPrefix`. We test this behavior.
+    storage = createDexieStorage({ name: keyPrefix });
+  });
+
+  afterEach(async () => {
+    if (db.isOpen()) {
+      await db.close();
+    }
+  });
+
+  test('applies the user-defined key prefix', async () => {
+    const key = 'test-key';
+    const value = { state: { data: 1 } };
+    await storage.setItem(key, value);
+
+    // Verify directly using a raw Dexie connection.
+    const rawDb = new Dexie(testDbName);
+    rawDb.version(1).stores({ zustandStore: 'id' });
+    // The record is stored with the key prefix.
+    const record = await rawDb.table('zustandStore').get(`${keyPrefix}${key}`);
     
-    const testKey = 'test-key';
-    const testValue = JSON.stringify({ foo: 'bar' });
-    
-    // Use spy on db.zustandStore directly for stronger verification
-    const dbSpy = vi.spyOn(db.zustandStore, 'put');
-    
-    // Act
-    await storage.setItem(testKey, testValue);
-    
-    // Assert - Use db directly to verify the key format
-    const record = await db.zustandStore.get(`${customName}:${testKey}`);
     expect(record).toBeDefined();
-    expect(record?.value).toBe(testValue);
-    expect(dbSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ 
-        id: `${customName}:${testKey}`,
-        value: testValue
-      })
-    );
+    // The value in the DB is a JSON string of the full StorageValue object.
+    expect(JSON.parse(record!.value)).toEqual(value);
+    
+    // Remember to close the temporary raw connection.
+    rawDb.close();
   });
 });

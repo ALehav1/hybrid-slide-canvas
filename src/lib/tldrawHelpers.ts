@@ -1,18 +1,5 @@
-import { type Editor, type TLShapePartial, type TLShapeId } from '@tldraw/tldraw'
-import { createUniqueShapeId as createUniqueId } from './utils/clientId'
-
-/**
- * Creates a unique shape ID prefixed with this client's instance ID to prevent
- * collisions across multiple browser tabs/instances
- * 
- * This is safer than direct nanoid() casts as TLShapeId doesn't include client prefix
- * 
- * @deprecated Use createUniqueShapeId from clientId.ts instead
- */
-export function createUniqueShapeId(): TLShapeId {
-  console.warn('Use clientId.createUniqueShapeId instead of tldrawHelpers.createUniqueShapeId')
-  return createUniqueId()
-}
+import { type Editor, type TLShapePartial, type TLShapeId } from '@tldraw/tldraw';
+import { createUniqueShapeId } from './utils/clientId';
 
 // Supported color tokens for shapes
 type ShapeColor = 'blue' | 'red' | 'green' | 'purple' | 'orange' | 'black' | 'gray' | 'none';
@@ -22,14 +9,14 @@ export function createSketchShape(
   editor: Editor,
   kind: 'rectangle' | 'ellipse' | 'diamond' | 'star',
   opts: {
-    w?: number;
-    h?: number;
-    label?: string;
-    fill?: ShapeColor;
-    color?: ShapeColor;
-    x?: number;
-    y?: number;
-    position?: 'center' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
+    w?: number | undefined;
+    h?: number | undefined;
+    label?: string | undefined;
+    fill?: ShapeColor | undefined;
+    color?: ShapeColor | undefined;
+    x?: number | undefined;
+    y?: number | undefined;
+    position?: 'center' | 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight' | undefined;
   } = {}
 ) {
   if (!editor) return;

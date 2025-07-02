@@ -70,20 +70,8 @@ describe('CanvasSlide', () => {
     expect(tldraw.getAttribute('data-persistence-key')).toBe('test-slide-1');
   });
 
-  test('renders children inside TLDraw', () => {
-    render(
-      <CanvasSlide 
-        slideId="test-slide-1" 
-        onEditorMount={mockOnEditorMount}
-      >
-        <div data-testid="child-element">Test Child</div>
-      </CanvasSlide>
-    );
-
-    const childElement = screen.getByTestId('child-element');
-    expect(childElement).toBeInTheDocument();
-    expect(childElement.textContent).toBe('Test Child');
-  });
+  // Removed test for rendering children inside TLDraw, as TLDraw does not support this pattern.
+  // Custom UI elements should be passed via the `components` prop to Tldraw.
 
   test('calls onEditorMount with editor instance when mounted', () => {
     render(

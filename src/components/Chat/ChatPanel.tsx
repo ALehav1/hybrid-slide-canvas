@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useTransition, Suspense, useState } from 'react';
-import { useEditor } from '@tldraw/tldraw';
+import type { Editor } from '@tldraw/tldraw';
 import { useConversationContext } from '../../hooks/useConversationContext';
 import { useSlidesStore } from '../../state/slidesStore';
 import { createSketchShape } from '../../lib/tldrawHelpers';
@@ -30,8 +30,11 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ error, onRetry }) => (
   </div>
 );
 
-export const ChatPanel: React.FC = () => {
-  const editor = useEditor();
+type ChatPanelProps = {
+  editor: Editor | null;
+};
+
+export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
   const currentSlideId = useSlidesStore(s => s.currentSlideId);
   const {
     dialogInput,

@@ -260,7 +260,8 @@ A critical architecture component is our unique shape ID generation strategy (im
    - **Actions Access**: Always use `slidesStore.getState().action()` pattern
    - **Store Reset**: Use built-in `slidesStore.getState().reset()` method to preserve action methods
    - **Type Safety**: Type stores as `StoreApi<StateInterface>` for method access
-   - **Hydration**: Await `slidesStore.persist?.rehydrate?.()` after actions for race-free assertions
+   - **Persistence Data Flow**: `storage.setItem` expects raw objects (handled by `createJSONStorage`), while direct `db.zustandStore` access reveals stringified JSON.
+   - **Test Isolation**: Use `db.open()` in `beforeEach` and `db.delete()`/`db.close()` in `afterEach` for reliable test isolation.
 
 3. **Testing Patterns**:
    - Storage adapter tests verify read/write operations
@@ -556,7 +557,17 @@ pnpm test:ui
   - Await `persist?.rehydrate?.()` after actions for race-free assertions
 - **Test Infrastructure**: Removed obsolete test utilities that used problematic `setState(initialData, true)` pattern
 - **Editor API Fixes**: Fixed TypeScript errors in `editor.select()` calls by ensuring flat array parameters
-- **100% Test Coverage**: All 12 slidesStore Dexie persistence tests now pass with stable, reliable patterns
+- **Dexie Persistence Tests Fixed**: All Dexie persistence tests now pass, with canonical patterns established for handling object-to-string serialization and deserialization across storage layers.
+
+### 2025-07-02 — Test Suite Stability & Refactoring
+
+- **Fixed Flaky Tests**: Resolved persistent test failures by implementing an explicit, per-test mocking strategy (`vi.doMock`/`vi.doUnmock`) for modules with dynamic imports. This ensures mocks are applied correctly and avoids conflicts with Vitest's module cache.
+- **Improved Global Test Setup**: Added `vi.resetModules()` to the global `afterEach` hook in `setupTests.ts` to guarantee a clean module cache between test files, further enhancing test isolation.
+- **Resolved All Lint Errors**: Conducted a full codebase sweep to eliminate TypeScript and lint warnings. This included:
+  - Centralizing shared type definitions (e.g., `LibraryItem`) into `src/lib/shapeLibraries/types.ts` to prevent circular dependencies.
+  - Adding explicit type annotations and correcting mock types to satisfy the strict TypeScript compiler.
+  - Removing unused imports and variables across multiple files.
+- **Corrected Test Logic**: Refactored `dexieStorage.test.ts` to fix flawed test logic and ensure the database connection is properly managed and tested.
 
 ### 2025-06-30 — State Management & Type-Safety Improvements
 

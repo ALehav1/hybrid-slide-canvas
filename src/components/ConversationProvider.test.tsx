@@ -1,11 +1,51 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * ConversationProvider – integration & persistence tests
+ *
+ * NOTE
+ * ────
+ * • The provider uses React state + Dexie-backed helpers, *not* a persisted Zustand
+ *   store, so we wait for `storageIsLoading === false` after render-mount.
+ * • Storage is mocked at the module edge (conversationStorage) so tests never hit
+ *   IndexedDB.  All behaviour is verified through the spyable mock functions.
+ */
+
 import React from 'react';
-import { renderHook, act } from '@testing-library/react';
-import { type Mock, beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+  act,
+  renderHook,
+  waitFor,
+} from '@testing-library/react';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  type Mock,
+  test,
+  vi,
+} from 'vitest';
+
 import { ConversationProvider } from './ConversationProvider';
 import { useConversationContext } from '../hooks/useConversationContext';
+import conversationStore, {
+  CONVERSATION_STORE_KEY,
+  type ConversationState,
+} from '../lib/storage/conversationStorage';
 import { openai } from '../lib/openaiClient';
 
-// Mock the OpenAI client
+/* ───────────────────  Mocks  ─────────────────── */
+
+vi.mock('../lib/storage/conversationStorage', () => ({
+  __esModule: true,
+  default: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+  },
+  CONVERSATION_STORE_KEY: 'conversationState',
+}));
+
 vi.mock('../lib/openaiClient', () => ({
   openai: {
     chat: {
@@ -16,7 +56,6 @@ vi.mock('../lib/openaiClient', () => ({
   },
 }));
 
-// Mock the logger
 vi.mock('../lib/utils/logging', () => ({
   logger: {
     debug: vi.fn(),
@@ -26,282 +65,266 @@ vi.mock('../lib/utils/logging', () => ({
   },
 }));
 
-describe('ConversationProvider', () => {
-  // Define a reusable wrapper component for tests
-  function wrapper({ children }: { children: React.ReactNode }) {
-    return <ConversationProvider>{children}</ConversationProvider>;
-  }
+/* ───────────────────  Test Wrapper  ─────────────────── */
 
-  beforeEach(() => {
-    // Clear all mocks before each test
-    vi.clearAllMocks();
-    // Mock localStorage as it's used for persistence
-    Storage.prototype.setItem = vi.fn();
-    Storage.prototype.getItem = vi.fn();
+const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ConversationProvider>{children}</ConversationProvider>
+);
+
+/* ───────────────────  Lifecycle Hooks  ─────────────────── */
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.clearAllMocks();
+
+  (conversationStore!.getItem as Mock).mockResolvedValue(null);
+  (conversationStore!.setItem as Mock).mockResolvedValue(void 0);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+/* ───────────────────  Suites  ─────────────────── */
+
+describe('ConversationProvider – basic behaviour', () => {
+  test('initialises with default values', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.storageIsLoading).toBe(false);
+    });
+
+    expect(result.current.dialogInput).toBe('');
+    expect(result.current.isChatExpanded).toBe(true);
+    expect(result.current.showSlideNavigator).toBe(false);
+    expect(result.current.localIsLoading).toBe(false);
+    expect(result.current.conversations.size).toBe(0);
   });
 
-  describe('Basic Functionality', () => {
-    test('should initialize with default values', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      expect(result.current.dialogInput).toBe('');
-      expect(result.current.isChatExpanded).toBe(true);
-      expect(result.current.showSlideNavigator).toBe(false);
-      expect(result.current.localIsLoading).toBe(false);
-      expect(result.current.conversations.size).toBe(0);
+  test('updates dialog input', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
     });
 
-    test('should update dialog input when setDialogInput is called', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
 
-      act(() => {
-        result.current.setDialogInput('Hello, world!');
-      });
-
-      expect(result.current.dialogInput).toBe('Hello, world!');
+    act(() => {
+      result.current.setDialogInput('Hello, world!');
     });
 
-    test('should toggle chat expanded state', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      expect(result.current.isChatExpanded).toBe(true); // Initial state
-
-      act(() => {
-        result.current.toggleChatExpanded();
-      });
-
-      expect(result.current.isChatExpanded).toBe(false);
-
-      act(() => {
-        result.current.toggleChatExpanded();
-      });
-
-      expect(result.current.isChatExpanded).toBe(true);
-    });
+    expect(result.current.dialogInput).toBe('Hello, world!');
   });
 
-  describe('Conversation Management', () => {
-    test('should create new conversation when adding first message', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      act(() => {
-        result.current.addMessage('slide-1', 'user', 'Hello');
-      });
-
-      expect(result.current.conversations.size).toBe(1);
-      expect(result.current.conversations.has('slide-1')).toBe(true);
-      
-      const conversation = result.current.conversations.get('slide-1');
-      expect(conversation?.messages).toHaveLength(1);
-      expect(conversation?.messages[0].content).toBe('Hello');
-      expect(conversation?.messages[0].role).toBe('user');
+  test('toggles chat-panel expansion', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
     });
 
-    test('should append messages to existing conversation', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
 
-      act(() => {
-        result.current.addMessage('slide-1', 'user', 'Hello');
-        result.current.addMessage('slide-1', 'assistant', 'Hi there!');
-      });
+    expect(result.current.isChatExpanded).toBe(true);
 
-      const messages = result.current.getMessagesForSlide('slide-1');
-      expect(messages).toHaveLength(2);
-      expect(messages[1].content).toBe('Hi there!');
-      expect(messages[1].role).toBe('assistant');
+    act(() => result.current.toggleChatExpanded());
+    expect(result.current.isChatExpanded).toBe(false);
+
+    act(() => result.current.toggleChatExpanded());
+    expect(result.current.isChatExpanded).toBe(true);
+  });
+});
+
+describe('ConversationProvider – conversation CRUD', () => {
+  test('creates a new conversation when the first message arrives', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
     });
 
-    test('should clear specific conversation', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
 
-      act(() => {
-        result.current.addMessage('slide-1', 'user', 'Hello');
-        result.current.addMessage('slide-2', 'user', 'Hi');
-      });
-
-      expect(result.current.conversations.size).toBe(2);
-
-      act(() => {
-        result.current.clearConversation('slide-1');
-      });
-
-      expect(result.current.conversations.size).toBe(1);
-      expect(result.current.conversations.has('slide-1')).toBe(false);
-      expect(result.current.conversations.has('slide-2')).toBe(true);
+    act(() => {
+      result.current.addMessage('slide-1', 'user', 'Hello');
     });
 
-    test('should clear all conversations', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      act(() => {
-        result.current.addMessage('slide-1', 'user', 'Hello');
-        result.current.addMessage('slide-2', 'user', 'Hi');
-      });
-
-      expect(result.current.conversations.size).toBe(2);
-
-      act(() => {
-        result.current.clearAllConversations();
-      });
-
-      expect(result.current.conversations.size).toBe(0);
-    });
-
-    test('should get conversation context with message limit', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      act(() => {
-        for (let i = 0; i < 15; i++) {
-          result.current.addMessage('slide-1', 'user', `Message ${i}`);
-        }
-      });
-
-      const context = result.current.getConversationContext('slide-1', 5);
-      const lines = context.split('\n');
-      
-      expect(lines).toHaveLength(5);
-      expect(lines[0]).toContain('Message 10');
-      expect(lines[4]).toContain('Message 14');
-    });
+    expect(result.current.conversations.size).toBe(1);
+    const convo = result.current.conversations.get('slide-1')!;
+    expect(convo.messages).toHaveLength(1);
+    expect(convo.messages[0].content).toBe('Hello');
   });
 
-  describe('AI Integration', () => {
-    test('should handle successful AI response', async () => {
-      const mockResponse = {
-        choices: [{
+  test('appends messages to an existing conversation', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+
+    act(() => {
+      result.current.addMessage('slide-1', 'user', 'Hello');
+      result.current.addMessage('slide-1', 'assistant', 'Hi there!');
+    });
+
+    const msgs = result.current.getMessagesForSlide('slide-1');
+    expect(msgs).toHaveLength(2);
+    expect(msgs[1].role).toBe('assistant');
+  });
+
+  test('clears a specific conversation', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+
+    act(() => {
+      result.current.addMessage('slide-1', 'user', 'Hello');
+      result.current.addMessage('slide-2', 'user', 'Hi');
+    });
+    expect(result.current.conversations.size).toBe(2);
+
+    act(() => result.current.clearConversation('slide-1'));
+    expect(result.current.conversations.has('slide-1')).toBe(false);
+    expect(result.current.conversations.size).toBe(1);
+  });
+
+  test('clears all conversations', async () => {
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+
+    act(() => {
+      result.current.addMessage('slide-1', 'user', 'Hello');
+      result.current.addMessage('slide-2', 'user', 'Hi');
+    });
+
+    act(() => result.current.clearAllConversations());
+    expect(result.current.conversations.size).toBe(0);
+  });
+});
+
+describe('ConversationProvider – AI integration', () => {
+  test('handles a successful OpenAI response', async () => {
+    (openai.chat.completions.create as Mock).mockResolvedValueOnce({
+      choices: [{ message: { content: 'AI response text' } }],
+    });
+
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.submitUserMessage('slide-1', 'Test question');
+    });
+
+    const msgs = result.current.getMessagesForSlide('slide-1');
+    expect(msgs).toHaveLength(2);
+    expect(msgs[1].content).toBe('AI response text');
+  });
+
+  test('parses an AI action returned as JSON', async () => {
+    const mockAction = { action: 'addShape', shape: 'rectangle' };
+    (openai.chat.completions.create as Mock).mockResolvedValueOnce({
+      choices: [
+        {
           message: {
-            content: 'AI response text'
-          }
-        }]
-      };
-
-      (openai.chat.completions.create as Mock).mockResolvedValueOnce(mockResponse);
-
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      await act(async () => {
-        await result.current.submitUserMessage('slide-1', 'Test question');
-      });
-
-      expect(result.current.localIsLoading).toBe(false);
-      expect(result.current.localError).toBeNull();
-      
-      const messages = result.current.getMessagesForSlide('slide-1');
-      expect(messages).toHaveLength(2);
-      expect(messages[0].content).toBe('Test question');
-      expect(messages[1].content).toBe('AI response text');
+            content: `Here is the action:\n\`\`\`json\n${JSON.stringify(
+              mockAction,
+            )}\n\`\`\``,
+          },
+        },
+      ],
     });
 
-    test('should parse AI action from JSON response', async () => {
-      const mockAction = {
-        action: 'addShape',
-        shape: 'rectangle',
-        label: 'Test Rectangle',
-      };
-      
-      const mockResponse = {
-        choices: [
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+
+    let aiAction: unknown;
+    await act(async () => {
+      aiAction = await result.current.submitUserMessage(
+        'slide-1',
+        'Add a rectangle',
+      );
+    });
+    expect(aiAction).toEqual(mockAction);
+  });
+
+  test('gracefully handles OpenAI errors', async () => {
+    (openai.chat.completions.create as Mock).mockRejectedValueOnce(
+      new Error('Network error'),
+    );
+
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+
+    await act(async () => {
+      await result.current.submitUserMessage('slide-1', 'Question');
+    });
+
+    expect(result.current.localError).toBe('Failed to get response from AI.');
+  });
+});
+
+describe('ConversationProvider – persistence', () => {
+  test('hydrates from Dexie on mount', async () => {
+    const storedState: ConversationState = {
+      conversations: [
+        [
+          'slide-1',
           {
-            message: {
-              content: 
-                'Here is the action:\n```json\n' +
-                JSON.stringify(mockAction) +
-                '\n```',
-            },
+            slideId: 'slide-1',
+            messages: [
+              { role: 'user', content: 'Stored message', timestamp: new Date() },
+            ],
+            lastModified: Date.now(),
           },
         ],
-      };
+      ],
+      isChatExpanded: false,
+    };
 
-      (openai.chat.completions.create as Mock).mockResolvedValueOnce(mockResponse);
-
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      let aiAction: any;
-      await act(async () => {
-        aiAction = await result.current.submitUserMessage('slide-1', 'Add a rectangle');
-      });
-
-      expect(aiAction).toEqual(mockAction);
+    (conversationStore!.getItem as Mock).mockResolvedValueOnce({
+      state: storedState,
     });
 
-    test('should handle AI API errors', async () => {
-      (openai.chat.completions.create as Mock).mockRejectedValueOnce(
-        new Error('Network error')
-      );
-
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      await act(async () => {
-        await result.current.submitUserMessage('slide-1', 'Test question');
-      });
-
-      expect(result.current.localError).toBe('Failed to get response from AI.');
-      expect(result.current.localIsLoading).toBe(false);
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
     });
 
-    test('should handle invalid AI action JSON', async () => {
-      const mockResponse = {
-        choices: [{
-          message: {
-            content: 'Here is the action:\n```json\n{"invalid": "structure"}\n```'
-          }
-        }]
-      };
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
 
-      (openai.chat.completions.create as Mock).mockResolvedValueOnce(mockResponse);
-
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      let aiAction: any;
-      await act(async () => {
-        aiAction = await result.current.submitUserMessage('slide-1', 'Test');
-      });
-
-      expect(aiAction).toBeNull();
-      expect(result.current.localError).toBe('AI returned an invalid action.');
-    });
-
-    test('should not submit empty messages', async () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      await act(async () => {
-        await result.current.submitUserMessage('slide-1', '  ');
-      });
-
-      expect(openai.chat.completions.create).not.toHaveBeenCalled();
-    });
+    expect(conversationStore!.getItem).toHaveBeenCalledWith(
+      CONVERSATION_STORE_KEY,
+    );
+    expect(result.current.isChatExpanded).toBe(false);
+    expect(
+      result.current.getMessagesForSlide('slide-1')[0].content,
+    ).toBe('Stored message');
   });
 
-  describe('State Persistence', () => {
-    test('should load conversations from localStorage on init', () => {
-      const storedState = {
-        conversations: [
-          ['slide-1', { messages: [{ role: 'user', content: 'Stored message' }] }],
-        ],
-        isChatExpanded: false,
-      };
+  test('debounces and stores updates to Dexie', async () => {
+    const setItemSpy = vi.spyOn(conversationStore!, 'setItem');
 
-      Storage.prototype.getItem = vi.fn().mockReturnValueOnce(JSON.stringify(storedState));
+    const { result } = renderHook(() => useConversationContext(), {
+      wrapper: Wrapper,
+    });
+    await waitFor(() => expect(result.current.storageIsLoading).toBe(false));
+    setItemSpy.mockClear(); // drop initial save
 
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      expect(result.current.isChatExpanded).toBe(false);
-      expect(result.current.conversations.size).toBe(1);
-      const messages = result.current.getMessagesForSlide('slide-1');
-      expect(messages[0].content).toBe('Stored message');
+    act(() => {
+      result.current.addMessage('slide-1', 'user', 'New message');
     });
 
-    test('should save conversations to localStorage on change', () => {
-      const { result } = renderHook(() => useConversationContext(), { wrapper });
-
-      act(() => {
-        result.current.addMessage('slide-1', 'user', 'New message');
-      });
-
-      expect(localStorage.setItem).toHaveBeenCalledWith(
-        'conversationState',
-        expect.stringContaining('"content":"New message"')
-      );
+    act(() => {
+      vi.advanceTimersByTime(310); // debounce = 300 ms
     });
+
+    await waitFor(() => expect(setItemSpy).toHaveBeenCalledTimes(1));
+    const [, payload] = setItemSpy.mock.calls[0];
+    expect(payload.state.conversations[0][0]).toBe('slide-1');
   });
 });

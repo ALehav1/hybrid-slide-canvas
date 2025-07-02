@@ -1,12 +1,4 @@
-import type { Editor } from '@tldraw/tldraw';
-
-/** Minimal built-in shape library (flowchart + org chart beginnings). */
-export interface LibraryItem {
-  id: string;
-  name: string;
-  preview: string;
-  factory: (editor: Editor | undefined) => Promise<void>;
-}
+import type { LibraryItem } from './types';
 
 export const basicLibrary: LibraryItem[] = [
   {

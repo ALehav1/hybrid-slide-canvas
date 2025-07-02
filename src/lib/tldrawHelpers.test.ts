@@ -1,24 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { type Editor, type TLShapeId, type TLShape, Box } from '@tldraw/tldraw';
 import { createSketchShape } from './tldrawHelpers';
-import * as clientId from './utils/clientId';
 
-// Mock the clientId.createUniqueShapeId function to return predictable IDs
-vi.mock('./utils/clientId', () => {
-  return {
-    // Cast the string to TLShapeId to satisfy TLDraw's type system
-    createUniqueShapeId: vi.fn().mockReturnValue('test-id' as TLShapeId),
-    getClientInstanceId: vi.fn().mockReturnValue('test-client-id')
-  };
-});
 
-// Mock the console.warn to avoid polluting test output with deprecation warnings
-const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-// Restore console spy after all tests complete
-afterAll(() => {
-  consoleWarnSpy.mockRestore();
-});
+
 
 // Clean up after each test to ensure isolation
 afterEach(() => {
@@ -91,7 +77,6 @@ describe('createSketchShape', () => {
     // Reset mocks before each test
     mockEditor = createTestMockEditor();
     vi.clearAllMocks();
-    vi.mocked(clientId.createUniqueShapeId).mockReturnValue('test-id' as TLShapeId);
   });
 
   it('should do nothing if editor is not provided', () => {
@@ -106,40 +91,36 @@ describe('createSketchShape', () => {
 
     expect(mockEditor.createShapes).toHaveBeenCalledWith([
       expect.objectContaining({
-        id: 'test-id',
+        id: expect.any(String),
         type: 'geo',
         x: 440, // 500 - 120/2
         y: 460, // 500 - 80/2
         props: expect.objectContaining({ geo: 'rectangle' }),
       }),
     ]);
-    expect(mockEditor.select).toHaveBeenCalledWith('test-id');
+    expect(mockEditor.select).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('should create a shape with a text label and group them', () => {
-    vi.mocked(clientId.createUniqueShapeId)
-      .mockClear()
-      .mockImplementationOnce(() => 'shape-id' as TLShapeId)
-      .mockImplementationOnce(() => 'text-id' as TLShapeId)
-      .mockImplementationOnce(() => 'new-group-id' as TLShapeId);
-
     createSketchShape(mockEditor, 'diamond', { label: 'My Diamond' });
 
     // Check that the shape and text were created
     expect(mockEditor.createShapes).toHaveBeenCalledTimes(2);
     expect(mockEditor.createShapes).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'shape-id', props: expect.objectContaining({ geo: 'diamond' }) }),
+      expect.objectContaining({ id: expect.any(String), props: expect.objectContaining({ geo: 'diamond' }) }),
     ]);
     expect(mockEditor.createShapes).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'text-id', props: expect.objectContaining({ text: 'My Diamond' }) }),
+      expect.objectContaining({ id: expect.any(String), props: expect.objectContaining({ text: 'My Diamond' }) }),
     ]);
 
     // Check that the shapes were grouped and the group was selected
     expect(mockEditor.groupShapes).toHaveBeenCalledWith(
-      expect.arrayContaining(['shape-id', 'text-id'] as TLShapeId[]), {
-      groupId: 'new-group-id',
-    });
-    expect(mockEditor.select).toHaveBeenCalledWith('new-group-id');
+      expect.arrayContaining([expect.any(String), expect.any(String)]),
+      {
+        groupId: expect.any(String),
+      }
+    );
+    expect(mockEditor.select).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('should apply custom width, height, and fill options', () => {

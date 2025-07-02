@@ -5,7 +5,7 @@ import '@testing-library/jest-dom';
 import { useEditor } from '@tldraw/tldraw';
 import { ChatPanel } from './ChatPanel';
 import { ConversationContext, type ConversationContextType, type ConversationMessage } from '../../context/ConversationContext';
-import { createSketchShape } from '../../lib/tldrawHelpers';
+import * as tldrawHelpers from '../../lib/tldrawHelpers';
 
 
 import type { AiAction } from './aiActions';
@@ -19,12 +19,14 @@ vi.mock('../../state/slidesStore', () => ({
 }));
 
 const mockUseEditor = useEditor as Mock;
-const mockCreateSketchShape = createSketchShape as Mock;
 
 
 
 // A helper to render ChatPanel with a mock context provider
-const renderWithMockContext = (contextValue: Partial<ConversationContextType>) => {
+const renderWithMockContext = (
+  contextValue: Partial<ConversationContextType>,
+  editor: any,
+) => {
   const defaultValue: ConversationContextType = {
     dialogInput: contextValue.dialogInput ?? '',
     setDialogInput: contextValue.setDialogInput ?? vi.fn(),
@@ -33,8 +35,10 @@ const renderWithMockContext = (contextValue: Partial<ConversationContextType>) =
     localIsLoading: contextValue.localIsLoading ?? false,
     localError: contextValue.localError ?? null,
     isPending: contextValue.isPending ?? false,
+    storageIsLoading: contextValue.storageIsLoading ?? false,
     clearError: contextValue.clearError ?? vi.fn(),
-    getMessagesForSlide: contextValue.getMessagesForSlide ?? vi.fn().mockReturnValue([]),
+    getMessagesForSlide:
+      contextValue.getMessagesForSlide ?? vi.fn().mockReturnValue([]),
     submitUserMessage: contextValue.submitUserMessage ?? vi.fn(),
     showSlideNavigator: false,
     slideNumberInput: '',
@@ -65,8 +69,8 @@ const renderWithMockContext = (contextValue: Partial<ConversationContextType>) =
 
   return render(
     <ConversationContext.Provider value={defaultValue}>
-      <ChatPanel />
-    </ConversationContext.Provider>
+      <ChatPanel editor={editor} />
+    </ConversationContext.Provider>,
   );
 };
 
@@ -98,7 +102,7 @@ describe('ChatPanel', () => {
   });
 
   test('renders correctly and displays placeholder', () => {
-    renderWithMockContext({});
+    renderWithMockContext({}, mockEditor);
     expect(screen.getByTestId('chat-panel')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Ask Slide-AI…')).toBeInTheDocument();
   });
@@ -109,7 +113,7 @@ describe('ChatPanel', () => {
       { role: 'assistant', content: 'General Kenobi!', timestamp: new Date() },
     ];
     const getMessagesForSlide = vi.fn().mockReturnValue(messages);
-    renderWithMockContext({ getMessagesForSlide });
+    renderWithMockContext({ getMessagesForSlide }, mockEditor);
     expect(screen.getByText('Hello there')).toBeInTheDocument();
     expect(screen.getByText('General Kenobi!')).toBeInTheDocument();
   });
@@ -117,7 +121,10 @@ describe('ChatPanel', () => {
   test('calls submitUserMessage on send', async () => {
     const submitUserMessage = vi.fn().mockResolvedValue(null);
     const setDialogInput = vi.fn();
-    renderWithMockContext({ submitUserMessage, setDialogInput, dialogInput: 'Create a diagram' });
+    renderWithMockContext(
+      { submitUserMessage, setDialogInput, dialogInput: 'Create a diagram' },
+      mockEditor,
+    );
 
     const sendButton = screen.getByTestId('send-button');
     await userEvent.click(sendButton);
@@ -128,27 +135,31 @@ describe('ChatPanel', () => {
   });
 
   test('handles AI action to add a shape', async () => {
+    const sketchSpy = vi.spyOn(tldrawHelpers, 'createSketchShape');
     const action: AiAction = {
       action: 'addShape',
       shape: 'diamond',
       label: 'Decision',
     };
     const submitUserMessage = vi.fn().mockResolvedValue(action);
-    renderWithMockContext({ submitUserMessage, dialogInput: 'add a diamond' });
+    renderWithMockContext(
+      { submitUserMessage, dialogInput: 'add a diamond' },
+      mockEditor,
+    );
 
     await userEvent.click(screen.getByTestId('send-button'));
 
     // The await on userEvent.click should be sufficient for the async handler to complete.
-    expect(mockCreateSketchShape).toHaveBeenCalledWith(mockEditor, 'diamond', { label: 'Decision' });
+    expect(sketchSpy).toHaveBeenCalledWith(mockEditor, 'diamond', { label: 'Decision' });
   });
 
   test('displays loading indicator when localIsLoading is true', () => {
-    renderWithMockContext({ localIsLoading: true });
+    renderWithMockContext({ localIsLoading: true }, mockEditor);
     expect(screen.getByTestId('loading-indicator')).toBeInTheDocument();
   });
 
   test('displays error message when localError is present', () => {
-    renderWithMockContext({ localError: 'An AI error occurred' });
+    renderWithMockContext({ localError: 'An AI error occurred' }, mockEditor);
     expect(screen.getByText('An AI error occurred')).toBeInTheDocument();
   });
 });
