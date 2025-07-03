@@ -31,16 +31,16 @@ export const createMockDB = () => {
  * Mock implementations of the IndexedDB service functions
  * These match the interface of our original indexedDb.ts service
  */
-export const initDatabase = vi.fn().mockImplementation(() => Promise.resolve());
-export const getDatabase = vi.fn().mockImplementation(() => Promise.resolve(createMockDB()));
-export const storeData = vi.fn().mockImplementation((_store: string, data: any) => {
+export const initDatabase = vi.fn().mockImplementation(async () => Promise.resolve());
+export const getDatabase = vi.fn().mockImplementation(async () => Promise.resolve(createMockDB()));
+export const storeData = vi.fn().mockImplementation(async (_store: string, data: any) => {
   return Promise.resolve(data.id || 'test-key');
 });
-export const getData = vi.fn().mockImplementation(() => Promise.resolve({}));
-export const deleteData = vi.fn().mockImplementation(() => Promise.resolve());
-export const getAllData = vi.fn().mockImplementation(() => Promise.resolve([]));
-export const clearStore = vi.fn().mockImplementation(() => Promise.resolve());
-export const getByIndex = vi.fn().mockImplementation(() => Promise.resolve({}));
+export const getData = vi.fn().mockImplementation(async () => Promise.resolve({}));
+export const deleteData = vi.fn().mockImplementation(async () => Promise.resolve());
+export const getAllData = vi.fn().mockImplementation(async () => Promise.resolve([]));
+export const clearStore = vi.fn().mockImplementation(async () => Promise.resolve());
+export const getByIndex = vi.fn().mockImplementation(async () => Promise.resolve({}));
 export const isIndexedDBSupported = vi.fn().mockReturnValue(true);
 
 // Add logger mock

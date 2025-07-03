@@ -74,26 +74,26 @@ export const logger = {
    * @param msg The message to log
    * @param data Optional data to include
    */
-  debug: (msg: string, data?: unknown): void => baseLog('debug', msg, data),
+  debug: (msg: string, data?: unknown): void => { baseLog('debug', msg, data); },
 
   /**
    * Log an informational message
    * @param msg The message to log
    * @param data Optional data to include
    */
-  info: (msg: string, data?: unknown): void => baseLog('info', msg, data),
+  info: (msg: string, data?: unknown): void => { baseLog('info', msg, data); },
 
   /**
    * Log a warning message
    * @param msg The message to log
    * @param data Optional data to include
    */
-  warn: (msg: string, data?: unknown): void => baseLog('warn', msg, data),
+  warn: (msg: string, data?: unknown): void => { baseLog('warn', msg, data); },
 
   /**
    * Log an error message
    * @param msg The message to log
    * @param data Optional data to include
    */
-  error: (msg: string, data?: unknown): void => baseLog('error', msg, data),
+  error: (msg: string, data?: unknown): void => { baseLog('error', msg, data); },
 } as const;

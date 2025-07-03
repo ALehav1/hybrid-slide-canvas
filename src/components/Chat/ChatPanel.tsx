@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useTransition, Suspense, useState } from 'react';
 import type { Editor } from '@tldraw/tldraw';
 import { useConversationContext } from '../../hooks/useConversationContext';
-import { useSlidesStore } from '../../state/slidesStore';
+import { useEnhancedSlidesStore } from '../../state/enhancedSlidesStore';
 import { createSketchShape } from '../../lib/tldrawHelpers';
 import { type AiAction } from './aiActions';
 
@@ -30,9 +30,9 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ error, onRetry }) => (
   </div>
 );
 
-type ChatPanelProps = {
+interface ChatPanelProps {
   editor: Editor | null;
-};
+}
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
   const currentSlideId = useSlidesStore(s => s.currentSlideId);
@@ -146,7 +146,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
               Thinking<span className="dot-animation">...</span>
             </p>
           }
-          {localError && <ErrorMessage error={localError} onRetry={() => clearError()} />}
+          {localError && <ErrorMessage error={localError} onRetry={() => { clearError(); }} />}
         </Suspense>
       </div>
       <div className="p-2 border-t">
@@ -160,7 +160,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
             className="w-full p-2 pr-10 border rounded-md"
             placeholder="Ask Slide-AI…"
             value={dialogInput}
-            onChange={(e) => setDialogInput(e.target.value)}
+            onChange={(e) => { setDialogInput(e.target.value); }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !localIsLoading && !isPending) {
                 e.preventDefault();

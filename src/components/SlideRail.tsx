@@ -1,6 +1,6 @@
 import React, { useTransition } from 'react';
 import { type Editor } from '@tldraw/tldraw';
-import { useSlidesStore } from '../state/slidesStore';
+import { useEnhancedSlidesStore } from '../state/enhancedSlidesStore';
 
 interface SlideRailProps {
   editor: Editor | null;
@@ -13,7 +13,9 @@ interface SlideRailProps {
  */
 export function SlideRail({ editor, className = '' }: SlideRailProps) {
   const [isPending, startTransition] = useTransition();
-  const { slides, currentSlideId, setCurrentSlide } = useSlidesStore();
+  const slides = useEnhancedSlidesStore(state => state.slides);
+  const currentSlideId = useEnhancedSlidesStore(state => state.currentSlideId);
+  const setCurrentSlide = useEnhancedSlidesStore(state => state.setCurrentSlide);
 
   return (
     <nav className={`w-[112px] border-l border-gray-200 overflow-y-auto bg-gray-50 p-2 ${className}`}>

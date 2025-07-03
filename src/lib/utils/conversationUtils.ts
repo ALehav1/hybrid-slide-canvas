@@ -2,7 +2,7 @@
  * Conversation utility functions
  */
 import { nanoid } from 'nanoid'
-import { MessageRole, type ConversationMessage } from '@/types/app'
+import { MessageRole, type ConversationMessage } from '@/lib/types'
 
 /**
  * Creates a welcome message with the current timestamp and a unique ID

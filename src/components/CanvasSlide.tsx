@@ -14,12 +14,12 @@ const CanvasLoadingFallback = () => (
   </div>
 );
 
-type Props = {
+interface Props {
   slideId: string;
   store: TLStore;
   onMount: (editor: Editor) => void;
   className?: string;
-};
+}
 
 // Custom TLDraw components for UI injection
 const customComponents: Partial<TLComponents> = {

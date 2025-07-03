@@ -102,14 +102,14 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
   }, []);
 
   // --- UI Convenience Methods ---
-  const toggleChatExpanded = useCallback(() => setIsChatExpanded((prev) => !prev), []);
-  const toggleSlideNavigator = useCallback(() => setShowSlideNavigator((prev) => !prev), []);
-  const clearError = useCallback(() => setLocalError(null), []);
+  const toggleChatExpanded = useCallback(() => { setIsChatExpanded((prev) => !prev); }, []);
+  const toggleSlideNavigator = useCallback(() => { setShowSlideNavigator((prev) => !prev); }, []);
+  const clearError = useCallback(() => { setLocalError(null); }, []);
   const resetDragState = useCallback(() => {
     setDraggedSlide(null);
     setDragOverSlide(null);
   }, []);
-  const clearInput = useCallback(() => setDialogInput(''), []);
+  const clearInput = useCallback(() => { setDialogInput(''); }, []);
   const resetChatState = useCallback(() => {
     setDialogInput('');
     setLocalIsLoading(false);
@@ -267,7 +267,7 @@ Based on the user request above, generate the corresponding JSON object.`;
           });
           return null;
         } finally {
-          startTransition(() => setLocalIsLoading(false));
+          startTransition(() => { setLocalIsLoading(false); });
         }
       });
 

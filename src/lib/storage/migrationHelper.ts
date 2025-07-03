@@ -116,7 +116,7 @@ export async function migrateSlides(force = false): Promise<boolean> {
     
     // Parse legacy data
     const parsedData = JSON.parse(legacyData);
-    if (!parsedData || !parsedData.state) {
+    if (!parsedData?.state) {
       logger.debug('Invalid legacy slides data format');
       markMigrationComplete(migrationId);
       return false;

@@ -8,8 +8,8 @@
  */
 
 import { useMemo } from 'react';
-import { type SlidesState, useSlidesStore } from './slidesStore';
-import { type SlideData, type ConversationMessage } from '../types/app';
+import { type SlidesState, useEnhancedSlidesStore } from './enhancedSlidesStore';
+import { type SlideData, type ConversationMessage } from '@/lib/types';
 import { logger } from '../lib/utils/logging';
 
 /**
@@ -131,7 +131,7 @@ export const selectors = {
   /**
    * Get recently updated slides (limited to max count)
    */
-  getRecentSlides: (state: SlidesSlice, maxCount: number = 5): SlideData[] => {
+  getRecentSlides: (state: SlidesSlice, maxCount = 5): SlideData[] => {
     return [...state.slides]
       .sort((a, b) => {
         const aDate = a.updatedAt instanceof Date ? a.updatedAt : new Date(a.updatedAt);
@@ -147,7 +147,7 @@ export const selectors = {
  * Memoized to prevent unnecessary re-renders
  */
 export function useSlides(slidesState: SlidesSlice) {
-  return useMemo(() => selectors.getSlides(slidesState), [slidesState.slides]);
+  return useMemo(() => selectors.getSlides(slidesState), [slidesState]);
 }
 
 /**
@@ -157,7 +157,7 @@ export function useSlides(slidesState: SlidesSlice) {
 export function useCurrentSlide(slidesState: SlidesSlice) {
   return useMemo(
     () => selectors.getCurrentSlide(slidesState),
-    [slidesState.currentSlideId, slidesState.slides]
+    [slidesState]
   );
 }
 
@@ -169,7 +169,7 @@ export function useSlideById(slidesState: SlidesSlice, slideId: string | null) {
   return useMemo(() => {
     if (!slideId) return undefined;
     return selectors.getSlideById(slidesState, slideId);
-  }, [slidesState.slides, slideId]);
+  }, [slidesState, slideId]);
 }
 
 /**
@@ -180,7 +180,7 @@ export function useNavigationState(slidesState: SlidesSlice) {
   return useMemo(() => ({
     canGoNext: selectors.canNavigateToNext(slidesState),
     canGoPrevious: selectors.canNavigateToPrevious(slidesState),
-  }), [slidesState.currentSlideId, slidesState.slides]);
+  }), [slidesState]);
 }
 
 /**
@@ -190,7 +190,7 @@ export function useNavigationState(slidesState: SlidesSlice) {
 export function useAdjacentSlides(slidesState: SlidesSlice) {
   return useMemo(
     () => selectors.getAdjacentSlides(slidesState),
-    [slidesState.currentSlideId, slidesState.slides]
+    [slidesState]
   );
 }
 
@@ -201,7 +201,7 @@ export function useAdjacentSlides(slidesState: SlidesSlice) {
 export function useSlideSearch(slidesState: SlidesSlice, searchTerm: string) {
   return useMemo(
     () => selectors.searchSlidesByTitle(slidesState, searchTerm),
-    [slidesState.slides, searchTerm]
+    [slidesState, searchTerm]
   );
 }
 
@@ -209,10 +209,10 @@ export function useSlideSearch(slidesState: SlidesSlice, searchTerm: string) {
  * React hook for getting recent slides
  * Memoized to prevent unnecessary re-renders
  */
-export function useRecentSlides(slidesState: SlidesSlice, maxCount: number = 5) {
+export function useRecentSlides(slidesState: SlidesSlice, maxCount = 5) {
   return useMemo(
     () => selectors.getRecentSlides(slidesState, maxCount),
-    [slidesState.slides, maxCount]
+    [slidesState, maxCount]
   );
 }
 
@@ -282,7 +282,7 @@ export const selectSlideProgress = (state: SlidesSlice) => ({
 /**
  * Selects slides with specific metadata values
  */
-export const selectSlidesByMetadata = (state: SlidesSlice, key: string, value: any) => 
+export const selectSlidesByMetadata = (state: SlidesSlice, key: string, value: unknown) => 
   state.slides.filter(slide => slide.metadata?.[key] === value);
 
 /**
@@ -295,7 +295,7 @@ export const selectCurrentSlideConversation = (state: SlidesSlice): Conversation
 
 export const selectSlideHasConversation = (state: SlidesSlice, slideId: string): boolean => {
   const slide = selectors.getSlideById(state, slideId);
-  return (slide?.conversation?.length || 0) > 1; // More than just the initial message
+  return (slide?.conversation.length || 0) > 1; // More than just the initial message
 };
 
 /**
@@ -307,33 +307,33 @@ export const selectSlideHasConversation = (state: SlidesSlice, slideId: string):
  * Hook to get all slides directly from the store
  */
 export function useSlidesFromStore() {
-  return useSlidesStore(selectSlides);
+  return useEnhancedSlidesStore(selectSlides);
 }
 
 /**
  * Hook to get the current slide directly from the store
  */
 export function useCurrentSlideFromStore() {
-  return useSlidesStore(selectCurrentSlide);
+  return useEnhancedSlidesStore(selectCurrentSlide);
 }
 
 /**
  * Hook to get navigation state directly from the store
  */
 export function useNavigationStateFromStore() {
-  return useSlidesStore(selectNavigationState);
+  return useEnhancedSlidesStore(selectNavigationState);
 }
 
 /**
  * Hook to get slide progress info directly from the store
  */
 export function useSlideProgressFromStore() {
-  return useSlidesStore(selectSlideProgress);
+  return useEnhancedSlidesStore(selectSlideProgress);
 }
 
 /**
  * Hook to get the current slide's conversation directly from the store
  */
 export function useCurrentConversationFromStore() {
-  return useSlidesStore(selectCurrentSlideConversation);
+  return useEnhancedSlidesStore(selectCurrentSlideConversation);
 }

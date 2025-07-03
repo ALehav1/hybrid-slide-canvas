@@ -1,103 +1,47 @@
 import React from 'react'
-import { useHistoryManager } from '@/hooks/useHistoryManager'
-import { type OriginType } from '@/state/useHistoryStore'     // selector no longer needed
-import { Editor } from 'tldraw'
+import { useHistoryManager } from '@/lib/history/useHistoryManager'
+import { useHistoryStore } from '@/lib/history/useHistoryStore'
 
-interface ToolbarProps {
-  editor: Editor | null
-}
+export const Toolbar: React.FC = () => {
+  // The useHistoryManager hook is responsible for creating and managing the HistoryManager instance.
+  // It's tied to the editor's lifecycle via the EditorContext.
+  const historyManager = useHistoryManager()
 
-export const Toolbar: React.FC<ToolbarProps> = ({ editor }) => {
-  const { undo, redo, setOrigin, canUndo, canRedo } = useHistoryManager(editor)
-  const [selectedOrigin, setSelectedOrigin] = React.useState<OriginType | 'all'>('all')
+  // We derive the canUndo/canRedo state from the length of the respective stacks.
+  // We are only concerned with the 'user' origin for the toolbar buttons.
+  const { canUndo, canRedo } = useHistoryStore((state) => ({
+    canUndo: state.stacks.user.undo.length > 0,
+    canRedo: state.stacks.user.redo.length > 0,
+  }))
 
-  const handleUndo = () =>
-    undo(selectedOrigin === 'all' ? undefined : selectedOrigin)
+  const handleUndo = () => {
+    historyManager?.undo('user')
+  }
 
-  const handleRedo = () =>
-    redo(selectedOrigin === 'all' ? undefined : selectedOrigin)
-
-  const handleOriginChange = (newOrigin: OriginType) => {
-    setSelectedOrigin(newOrigin)
-    setOrigin(newOrigin)
+  const handleRedo = () => {
+    historyManager?.redo('user')
   }
 
   return (
-    <div className="toolbar">
-      {/* Origin Selection */}
-      <div className="origin-selector">
-        <label htmlFor="origin-select">Active Origin:</label>
-        <select 
-          id="origin-select"
-          aria-label="Select active origin for history operations"
-          value={selectedOrigin} 
-          onChange={(e) => {
-            const value = e.target.value as OriginType | 'all'
-            if (value !== 'all') {
-              handleOriginChange(value)
-            }
-            setSelectedOrigin(value)
-          }}
-        >
-          <option value="all">All Origins</option>
-          <option value="user">User</option>
-          <option value="ai">AI</option>
-          <option value="template">Template</option>
-        </select>
-      </div>
-
-      {/* Undo/Redo Controls */}
-      <div className="history-controls" role="group" aria-label="History controls">
-        <button 
-          onClick={handleUndo}
-          disabled={selectedOrigin === 'all' ? !canUndo.all : !canUndo[selectedOrigin]}
-          className="history-btn"
-          title={`Undo ${selectedOrigin === 'all' ? 'any' : selectedOrigin} action`}
-          aria-label={`Undo ${selectedOrigin === 'all' ? 'any' : selectedOrigin} action`}
-        >
-          ⟲ Undo
-        </button>
-        
-        <button 
-          onClick={handleRedo}
-          disabled={selectedOrigin === 'all' ? !canRedo.all : !canRedo[selectedOrigin]}
-          className="history-btn"
-          title={`Redo ${selectedOrigin === 'all' ? 'any' : selectedOrigin} action`}
-          aria-label={`Redo ${selectedOrigin === 'all' ? 'any' : selectedOrigin} action`}
-        >
-          ⟳ Redo
-        </button>
-      </div>
-
-      {/* Origin-specific Controls */}
-      <div className="origin-controls">
-        <button 
-          onClick={() => undo('user')}
-          disabled={!canUndo.user}
-          className="origin-btn user-btn"
-          aria-label="Undo last user action"
-        >
-          ⟲ User
-        </button>
-        
-        <button 
-          onClick={() => undo('ai')}
-          disabled={!canUndo.ai}
-          className="origin-btn ai-btn"
-          aria-label="Undo last AI action"
-        >
-          ⟲ AI
-        </button>
-        
-        <button 
-          onClick={() => undo('template')}
-          disabled={!canUndo.template}
-          className="origin-btn template-btn"
-          aria-label="Undo last template action"
-        >
-          ⟲ Template
-        </button>
-      </div>
+    <div className="h-11 border-b px-2 flex items-center gap-2 bg-white">
+      <button
+        data-testid="toolbar-undo-button"
+        onClick={handleUndo}
+        disabled={!canUndo}
+        className="px-2 py-1 border rounded disabled:opacity-50"
+      >
+        Undo
+      </button>
+      <button
+        data-testid="toolbar-redo-button"
+        onClick={handleRedo}
+        disabled={!canRedo}
+        className="px-2 py-1 border rounded disabled:opacity-50"
+      >
+        Redo
+      </button>
+      {/* …other controls… */}
     </div>
   )
 }
+

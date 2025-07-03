@@ -6,9 +6,9 @@ import App from '../App';
 // Mock the OpenAI client to prevent API calls and import.meta errors
 vi.mock('../lib/openaiClient');
 
-// Mock the slides store to provide a stable state for the App component
-vi.mock('../state/slidesStore', () => ({
-  useSlidesStore: vi.fn(() => ({
+// Mock the enhanced slides store to provide a stable state for the App component
+vi.mock('../state/enhancedSlidesStore', () => ({
+  useEnhancedSlidesStore: vi.fn(() => ({
     slides: [
       { id: '1', number: 1, frameId: 'frame1', conversation: [], createdAt: new Date().toISOString(), title: 'Slide 1' },
       { id: '2', number: 2, frameId: 'frame2', conversation: [], createdAt: new Date().toISOString(), title: 'Slide 2' },

@@ -1,45 +1,70 @@
-import React from 'react';
-import { type Editor } from '@tldraw/tldraw';
-import { LibraryPanel } from './LibraryPanel';
-import { ChatPanel } from './Chat/ChatPanel';
-import { CanvasSlide } from './CanvasSlide';
-import { SlideRail } from './SlideRail';
-import { useSlidesStore } from '../state/slidesStore';
 
-interface CanvasRegionProps {
-  editor: Editor | null;
-  onEditorMount: (editor: Editor) => void;
-}
+import React, { useMemo } from 'react'
+import {
+  type Editor,
+  createTLStore,
+  defaultShapeUtils,
+  type TLStore,
+} from '@tldraw/tldraw'
+
+import { LibraryPanel } from './LibraryPanel'
+import { ChatPanel } from './Chat/ChatPanel'
+import { CanvasSlide } from './CanvasSlide'
+import { SlideRail } from './SlideRail'
+import { Toolbar } from './Toolbar'
+import { useEnhancedSlidesStore } from '@/state/enhancedSlidesStore'
+import { EditorContext } from '@/lib/tldraw/EditorContext'
 
 /**
- * CanvasRegion - Three-panel layout manager
- * Implements the exact Figma/Canva layout: 288px sidebar | fluid canvas | 112px thumbnail rail
- * Isolates TLDraw from React layout concerns by providing explicit children structure
+ * CanvasRegion
+ * ┌──────────┬───────────────────────┬──────────┐
+ * │ sidebar  │   canvas / toolbar    │ thumbnails
+ * └──────────┴───────────────────────┴──────────┘
  */
-export function CanvasRegion({ editor, onEditorMount }: CanvasRegionProps) {
-  const { currentSlideId } = useSlidesStore();
+interface CanvasRegionProps {
+  /** the *currently mounted* editor instance (set by CanvasSlide on mount) */
+  editor: Editor | null
+  /** callback forwarded to <CanvasSlide onMount> */
+  onEditorMount: (editor: Editor) => void
+}
+
+export const CanvasRegion: React.FC<CanvasRegionProps> = ({
+  editor,
+  onEditorMount,
+}) => {
+  const currentSlideId = useSlidesStore((s) => s.currentSlideId)
+
+  const store: TLStore = useMemo(
+    () => createTLStore({ shapeUtils: defaultShapeUtils }),
+    [currentSlideId]
+  )
 
   return (
     <div className="flex h-full">
-      {/* Left Sidebar - 288px fixed width */}
+      {/* left sidebar */}
       <aside className="w-[288px] shrink-0 border-r bg-white flex flex-col">
-        <LibraryPanel editor={editor} />
-        <ChatPanel editor={editor} />
+        <LibraryPanel />
+        <ChatPanel />
       </aside>
 
-      {/* Main Canvas - Fluid width */}
-      <CanvasSlide 
-        key={currentSlideId} 
-        slideId={currentSlideId} 
-        className="flex-1"
-        onEditorMount={onEditorMount}
-      />
+      {/* canvas column */}
+      <EditorContext.Provider value={editor}>
+        <main className="flex-1 flex flex-col">
+          <Toolbar /> {/* consumes context */}
+          <CanvasSlide
+            key={currentSlideId}
+            slideId={currentSlideId}
+            store={store}
+            onMount={onEditorMount}
+            className="flex-1"
+          />
+        </main>
+      </EditorContext.Provider>
 
-      {/* Right Thumbnail Rail - 112px fixed width */}
-      <SlideRail 
+      <SlideRail
         editor={editor}
-        className="w-[112px] shrink-0 border-l bg-gray-50" 
+        className="w-[112px] shrink-0 border-l bg-gray-50"
       />
     </div>
-  );
+  )
 }

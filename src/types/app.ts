@@ -2,7 +2,10 @@
  * Core application types for the Hybrid Slide Canvas project
  * Enhanced with stricter type definitions for better type safety
  */
-import type { Editor, TLShapeId } from '@tldraw/tldraw';
+import type { Editor, TLStoreSnapshot, TLRecord } from '@tldraw/tldraw'
+
+/** A complete tldraw snapshot for a slide */
+export type SlideSnapshot = TLStoreSnapshot
 import { z } from 'zod';
 
 /* ---------- Constants ---------- */
@@ -50,15 +53,15 @@ export const ConversationMessageSchema = z.object({
  * hydrated back to Date objects when loaded from storage
  */
 export interface SlideData<M extends Record<string, unknown> = Record<string, unknown>> {
-  id: string; // Required unique identifier
-  number: number;
-  title: string; // Required title
-  frameId: TLShapeId;
-  conversation: ConversationMessage[];
-  createdAt: Date; // Will be serialized to string in storage
-  updatedAt: Date; // Will be serialized to string in storage
-  thumbnailUrl?: string; // Optional thumbnail
-  metadata?: M; // Optional metadata for extensibility with generic type
+  id: string
+  number: number
+  title: string
+  /** The key we look up in the `snapshots` dictionary in the store. */
+  snapshotId: string
+  createdAt: Date
+  updatedAt: Date
+  thumbnailUrl?: string
+  metadata?: M
 }
 
 /**
@@ -69,8 +72,7 @@ export const SlideDataSchema = z.object({
   id: z.string().min(1),
   number: z.number().int().nonnegative(),
   title: z.string().min(1, 'Slide title cannot be empty'),
-  frameId: z.string().min(1),
-  conversation: z.array(ConversationMessageSchema),
+  snapshotId: z.string().min(1),
   createdAt: z.date(),
   updatedAt: z.date(),
   thumbnailUrl: z.string().url().optional(),
@@ -83,8 +85,8 @@ export const SlideDataSchema = z.object({
  * Preserves generic metadata type from SlideData
  */
 export type CreateSlideOptions<M extends Record<string, unknown> = Record<string, unknown>> = 
-  Pick<SlideData<M>, 'number' | 'frameId'> & 
-  Partial<Omit<SlideData<M>, 'number' | 'frameId' | 'createdAt' | 'updatedAt'>>;
+  Pick<SlideData<M>, 'number' | 'snapshotId'> & 
+  Partial<Omit<SlideData<M>, 'number' | 'snapshotId' | 'createdAt' | 'updatedAt'>>;
 
 /**
  * Direction type for slide navigation
@@ -103,6 +105,14 @@ export interface TLDEditor extends Pick<Editor, 'createShapes' | 'deleteShapes' 
  * Interface for the slide orchestration hook return value
  * Note: Preserves generic metadata type from SlideData
  */
+/**
+ * Interface for the slides state data
+ */
+export interface SlidesStateData {
+  slides: SlideData[];
+  currentSlideId: string;
+}
+
 export interface UseSlideOrchestrationReturn<M extends Record<string, unknown> = Record<string, unknown>> {
   // State
   slides: SlideData<M>[];

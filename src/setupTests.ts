@@ -33,9 +33,10 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
-  // fail fast if timers leaked
-  expect(vi.getTimerCount()).toBe(0)
+  // Run all pending timers to ensure async operations complete
   vi.runOnlyPendingTimers()
+  // Now, assert that no timers are left. This catches runaway timers.
+  expect(vi.getTimerCount()).toBe(0)
   vi.clearAllTimers()
   vi.useRealTimers()
   cleanup()

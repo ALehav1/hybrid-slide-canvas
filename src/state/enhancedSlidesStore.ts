@@ -15,9 +15,7 @@ import { persist } from 'zustand/middleware';
 import { type Editor, createShapeId } from '@tldraw/tldraw';
 import { nanoid } from 'nanoid';
 import { logger } from '../lib/utils/logging';
-import { type SlideData, type ConversationMessage } from '../types/app';
-// Reuse selectors from slidesSelectors by adding them to the store
-import { selectors } from './slidesSelectors';
+import { type SlideData, type ConversationMessage } from '@/lib/types';
 import createDexieStorage from '../lib/storage/dexieStorage';
 
 // Initialize Dexie storage adapter
@@ -29,16 +27,12 @@ const dexieStorage = createDexieStorage({
 // NOTE: Dexie initialization is handled by the storage adapter
 // This happens automatically when createDexieStorage is called
 
-// The core data structure for a single slide
-// This extends SlideData with additional UI-specific properties
-export type Slide = SlideData & {
-  thumbnail?: string; // URL or data URI for the thumbnail (optional)
-};
+
 
 // The state and actions for the slides store
 export interface SlidesState {
   // State
-  slides: Slide[];
+  slides: SlideData[];
   currentSlideId: string;
   isLoaded: boolean;
   isHydrated: boolean;
@@ -64,18 +58,19 @@ const initialMessage: ConversationMessage = {
   id: nanoid()
 };
 
-const initialSlidesState = {
+const initialSlidesState: { slides: SlideData[], currentSlideId: string, isLoaded: boolean, isHydrated: boolean } = {
   slides: [
     {
       id: 'slide-1',
       number: 1,
+      snapshotId: 'placeholder-snapshot-1', // Added placeholder snapshotId
       frameId: createShapeId('frame_1'),
       title: 'Slide 1',
-      thumbnail: '/placeholder.png',
+      thumbnailUrl: '/placeholder.png',
       conversation: [initialMessage],
       createdAt: new Date(),
       updatedAt: new Date(),
-      metadata: { isInitialized: true }
+      metadata: { isInitialized: true },
     },
   ],
   currentSlideId: 'slide-1',
@@ -96,56 +91,7 @@ const serializeSlides = (state: SlidesState) => {
   };
 };
 
-/**
- * Helper to deserialize slide content and merge with metadata
- */
-const deserializeSlides = (persistedState: any, currentState: SlidesState) => {
-  if (!persistedState || !persistedState.slidesMetadata) {
-    return {
-      ...currentState,
-      isLoaded: true,
-      isHydrated: true,
-    };
-  }
-  
-  // Create a map of existing slides by ID for easier lookup
-  const slideContentMap = new Map();
-  currentState.slides.forEach(slide => {
-    slideContentMap.set(slide.id, {
-      conversation: slide.conversation,
-      metadata: slide.metadata,
-    });
-  });
-  
-  // Merge persisted metadata with existing slide content
-  const mergedSlides = persistedState.slidesMetadata.map((metadata: any) => {
-    const existingContent = slideContentMap.get(metadata.id) || {
-      conversation: [],
-      metadata: {},
-    };
-    
-    return {
-      ...metadata,
-      conversation: existingContent.conversation,
-      metadata: existingContent.metadata,
-      // Ensure dates are proper Date objects
-      createdAt: metadata.createdAt instanceof Date 
-        ? metadata.createdAt 
-        : new Date(metadata.createdAt),
-      updatedAt: metadata.updatedAt instanceof Date 
-        ? metadata.updatedAt 
-        : new Date(metadata.updatedAt),
-    };
-  });
-  
-  return {
-    ...currentState,
-    slides: mergedSlides,
-    currentSlideId: persistedState.currentSlideId || currentState.currentSlideId,
-    isLoaded: true,
-    isHydrated: true,
-  };
-};
+
 
 /**
  * Slides store with enhanced Dexie persistence
@@ -155,50 +101,54 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
     (set, get) => ({
       ...initialSlidesState,
 
-      /**
-       * Adds a new slide with a corresponding frame in the editor.
-       */
       addFrameSlide: (editor: Editor) => {
-        if (!editor) return;
-
         const newSlideNumber = get().slides.length + 1;
-        const id = `slide-${nanoid(6)}`;
-        const frameId = createShapeId(`frame_${newSlideNumber}`);
+        const newSlideId = `slide-${nanoid(6)}`;
+        const newFrameId = createShapeId(`frame_${newSlideNumber}`);
         const title = `Slide ${newSlideNumber}`;
 
-        logger.info('Adding new slide', { id, frameId });
+        logger.info('Adding new slide', { id: newSlideId, frameId: newFrameId });
 
-        // Create a new slide with all required fields
-        const newSlide: Slide = {
-          id,
+        const newSlide: SlideData = {
+          id: newSlideId,
           number: newSlideNumber,
-          frameId,
+          snapshotId: `placeholder-snapshot-${newSlideNumber}`,
+          frameId: newFrameId,
           title,
-          thumbnail: '/placeholder.png', // Placeholder, will be updated later
-          conversation: [],
+          thumbnailUrl: '/placeholder.png',
+          conversation: [
+            {
+              role: 'assistant',
+              content: 'This is a new slide. What should we create?',
+              timestamp: new Date(),
+              id: nanoid(),
+            },
+          ],
           createdAt: new Date(),
           updatedAt: new Date(),
-          metadata: { isNew: true }
+          metadata: { isInitialized: false },
         };
 
-        // Create the frame shape in the tldraw canvas
         const frameShape = {
-          id: frameId,
+          id: newFrameId,
           type: 'frame' as const,
-          x: 100 + (newSlideNumber - 1) * 850, // Position new frames side-by-side
+          x: 100 + (newSlideNumber - 1) * 850,
           y: 100,
           props: { w: 800, h: 600, name: title },
         };
+
+        // Side-effect: create shape in editor
         editor.createShapes([frameShape]);
 
+        // Update state
         set((state) => ({
           slides: [...state.slides, newSlide],
-          currentSlideId: id,
+          currentSlideId: newSlideId,
         }));
 
-        // Zoom to fit the new frame after a short delay
+        // Side-effect: zoom to new frame
         setTimeout(() => {
-          const shape = editor.getShape(frameId);
+          const shape = editor.getShape(newFrameId);
           if (shape) {
             const bounds = editor.getShapePageBounds(shape);
             if (bounds) {
@@ -206,17 +156,9 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
             }
           }
         }, 100);
-        
-        // Store slide content - now handled by Dexie persistence
-        // No need to manually store slide content anymore
-        logger.debug('New slide created with ID', id);
       },
 
-      /**
-       * Deletes a slide and its corresponding frame from the editor.
-       */
       deleteSlide: (slideId: string, editor: Editor) => {
-        if (!editor) return;
         if (get().slides.length <= 1) {
           logger.warn('Cannot delete the last slide');
           return;
@@ -224,41 +166,32 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
 
         const slideToDelete = get().slides.find((s) => s.id === slideId);
         if (!slideToDelete) {
-          logger.error('Slide to delete not found', { slideId });
+          logger.error('Could not find slide to delete', { slideId });
           return;
         }
 
         logger.info('Deleting slide', { slideId });
-
-        // Delete the frame from the tldraw canvas
         editor.deleteShapes([slideToDelete.frameId]);
 
         set((state) => {
-          const remainingSlides = state.slides.filter((s) => s.id !== slideId);
+          const slides = state.slides.filter((s) => s.id !== slideId);
           let newCurrentSlideId = state.currentSlideId;
 
-          // If the deleted slide was the current one, select the previous or first slide
           if (state.currentSlideId === slideId) {
             const deletedIndex = state.slides.findIndex((s) => s.id === slideId);
             const newIndex = Math.max(0, deletedIndex - 1);
-            newCurrentSlideId = remainingSlides[newIndex].id;
+            newCurrentSlideId = slides[newIndex]?.id || '';
           }
 
           return {
-            slides: remainingSlides,
+            slides,
             currentSlideId: newCurrentSlideId,
           };
         });
-        
-        // Also remove from IndexedDB
-        idb.deleteData('slideContent', slideId).catch(error => {
-          logger.error('Failed to delete slide content from IndexedDB', error);
-        });
+
+        logger.info('Deleted slide and frame', { slideId, frameId: slideToDelete.frameId });
       },
 
-      /**
-       * Sets the current slide and focuses the editor on its frame.
-       */
       setCurrentSlide: (id: string, editor?: Editor) => {
         if (!editor) {
           set({ currentSlideId: id });
@@ -324,7 +257,7 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
           
           slides[slideIndex] = {
             ...slides[slideIndex],
-            thumbnail: thumbnailUrl,
+            thumbnailUrl: thumbnailUrl,
             updatedAt: new Date(),
           };
           
@@ -358,7 +291,7 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
       /**
        * Resets the store to its initial state.
        */
-      reset: () => set(initialSlidesState),
+      reset: () => { set(initialSlidesState); },
 
       /**
        * Force persist slides to storage.
@@ -377,23 +310,25 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
       name: 'enhanced-slides-store',
       storage: dexieStorage,
       partialize: serializeSlides, // Use our existing serializer
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state?: SlidesState, error?: unknown) => {
+        if (error) {
+          logger.error('Failed to rehydrate enhanced slides store from Dexie', { error });
+        }
         if (state) {
           // State successfully rehydrated from Dexie
           logger.debug('Enhanced slides store rehydrated from Dexie');
-          // We can't directly use 'set' here as it's not in scope
-          // The state will be automatically merged by Zustand
-          return { ...state, isLoaded: true, isHydrated: true };
+          // The state will be automatically merged by Zustand, but we can set transient flags.
+          state.isLoaded = true;
+          state.isHydrated = true;
         }
-        return undefined;
       },
       version: 1
     }
   )
 );
 
-// Export all selectors
-export { selectors, useSlides, useCurrentSlide, useSlideById, 
+// Selectors are now co-located and do not need to be exported from a separate file.
+export { useSlides, useCurrentSlide, useSlideById, 
   useNavigationState, useAdjacentSlides, useSlideSearch, useRecentSlides } from './slidesSelectors';
 
 // Initialize the store early (singleton pattern)

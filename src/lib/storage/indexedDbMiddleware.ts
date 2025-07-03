@@ -303,7 +303,7 @@ export const createIndexedDbMiddleware: IndexedDbMiddleware = (f, userOptions) =
  * Helper function to create a persisted store with IndexedDB
  */
 export const createIndexedDbStore = <T,>(
-  f: StateCreator<T, [], []>,
+  f: StateCreator<T>,
   options: IndexedDBOptions<T>,
 ): StoreWithPersist<ReturnType<typeof f>> => {
   return f(createIndexedDbMiddleware<T>(f, options)) as StoreWithPersist<ReturnType<typeof f>>;

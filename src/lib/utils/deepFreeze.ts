@@ -10,7 +10,7 @@
 export const deepFreeze = <T>(input: T): T => {
   if (import.meta.env.PROD || typeof input !== 'object' || input === null) return input;
 
-  const seen = new WeakSet<object>();
+  const seen = new WeakSet();
 
   const freezeRecursively = (obj: any) => {
     if (typeof obj !== 'object' || obj === null || seen.has(obj)) return;

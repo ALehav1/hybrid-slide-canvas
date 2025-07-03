@@ -137,9 +137,9 @@ export interface HistoryBatch {
   description: string;
   
   /** Array of individual changes in this batch */
-  changes: Array<{
+  changes: {
     undo: () => void;
     redo: () => void;
     metadata?: Record<string, unknown>;
-  }>;
+  }[];
 }

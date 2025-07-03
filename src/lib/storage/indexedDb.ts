@@ -44,11 +44,11 @@ interface HybridCanvasDB extends DBSchema {
     key: string; // slide ID
     value: {
       slideId: string;
-      messages: Array<{
+      messages: {
         role: 'user' | 'assistant';
         content: string;
         timestamp: Date;
-      }>;
+      }[];
       lastModified: number;
     };
     indexes: {
@@ -217,7 +217,7 @@ export async function deleteData<T extends keyof HybridCanvasDB>(
  */
 export async function getAllData<T extends keyof HybridCanvasDB>(
   storeName: T
-): Promise<Array<HybridCanvasDB[T]['value']>> {
+): Promise<HybridCanvasDB[T]['value'][]> {
   const db = await getDatabase();
   const tx = db.transaction(storeName, 'readonly');
   const store = tx.objectStore(storeName);

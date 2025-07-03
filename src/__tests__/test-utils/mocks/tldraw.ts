@@ -16,6 +16,7 @@ export const mockEditor = {
   store: { 
     getAllShapes: vi.fn().mockReturnValue([]),
     subscribe: vi.fn(),
+    listen: vi.fn(() => vi.fn()), // Return a mock unsubscribe function
     getSnapshot: vi.fn().mockReturnValue({})
   },
   createShapes: vi.fn(),

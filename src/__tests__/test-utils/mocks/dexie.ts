@@ -29,7 +29,7 @@ class WarningDexie {
   version() { return this; }
   stores() { return this; }
   table() { return {}; }
-  open() { return Promise.resolve(this); }
+  async open() { return Promise.resolve(this); }
   close() {}
 }
 

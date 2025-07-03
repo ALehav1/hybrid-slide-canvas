@@ -9,13 +9,13 @@ import * as tldrawHelpers from '../../lib/tldrawHelpers';
 
 
 import type { AiAction } from './aiActions';
-import { useSlidesStore } from '../../state/slidesStore';
+import { useEnhancedSlidesStore } from '../../state/enhancedSlidesStore';
 
 // --- Mocks ---
 vi.mock('@tldraw/tldraw');
 vi.mock('../../lib/tldrawHelpers');
-vi.mock('../../state/slidesStore', () => ({
-  useSlidesStore: vi.fn(),
+vi.mock('../../state/enhancedSlidesStore', () => ({
+  useEnhancedSlidesStore: vi.fn(),
 }));
 
 const mockUseEditor = useEditor as Mock;

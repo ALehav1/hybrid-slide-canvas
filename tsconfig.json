@@ -9,16 +9,16 @@
     "strict": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "noEmit": true,
+    "declaration": false,
+    "composite": false,
+    "emitDeclarationOnly": false,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "src/__tests__/**/*"],
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/__tests__/**/*.ts", "src/__tests__/**/*.tsx"],
+  "exclude": ["src/**/*.d.ts"],
 }

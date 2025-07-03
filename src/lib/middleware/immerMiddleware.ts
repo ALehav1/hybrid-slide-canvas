@@ -40,7 +40,7 @@ export const immerMiddleware = <T extends object>(
       Object.freeze(nextState); // Shallow freeze for safety
     }
     
-    return set(nextState, replace);
+    set(nextState, replace);
   };
 
   return config(immerSet, get, api);

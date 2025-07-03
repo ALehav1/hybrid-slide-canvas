@@ -1,248 +1,185 @@
-/* --------------------------------------------------------------------------
-   slidesStore.ts  –  one-file, compile-clean replacement
-   -------------------------------------------------------------------------- */
+/* ────────────────────────────────────────────────────────────
+   slidesStore.ts  – v2  (light data + out-of-draft snapshots)
+   ──────────────────────────────────────────────────────────── */
 
-/* =====  1.  External deps  ===== */
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
-import { nanoid } from 'nanoid'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import Dexie from 'dexie'
-import type { Draft } from 'immer'
-import type { Editor, TLShapeId } from '@tldraw/tldraw'
-import { deepFreeze } from '../lib/utils/deepFreeze'
-import { createUniqueShapeId } from '../lib/utils/clientId'
-import { createWelcomeMessage } from '../lib/utils/conversationUtils'
+import { nanoid } from 'nanoid'
+import type {
+  Editor,
+  StoreSnapshot,
+  TLRecord,
+  TLStore,
+} from '@tldraw/tldraw'
 
-/* ===========================================================================
-   2.  Minimal shared-type definitions  (✨ extract to "@/types/app.ts")
-   =========================================================================== */
-type MessageRole = 'user' | 'assistant'
+import type { SlideData } from '@/lib/types'
+import { createWelcomeMessage } from '@/lib/utils/conversationUtils'
+import { deepFreeze } from '@/lib/utils/deepFreeze'
 
-export interface ConversationMessage {
-  id: string
-  role: MessageRole
-  content: string
-  timestamp: Date
+/* ------------------------------------------------------------------ */
+/* 1 ▸ Dexie storage adapter (unchanged)                              */
+/* ------------------------------------------------------------------ */
+class SlidesDB extends Dexie {
+  zustand!: Dexie.Table<{ id: string; value: string }, string>
+  constructor() {
+    super('slidesDB')
+    this.version(1).stores({ zustand: 'id' })
+  }
+}
+const db = new SlidesDB()
+const dexieStorage = {
+  getItem: (k: string) => db.zustand.get(k).then(r => r?.value ?? null),
+  setItem: (k: string, v: string) => db.zustand.put({ id: k, value: v }),
+  removeItem: (k: string) => db.zustand.delete(k),
 }
 
-export interface SlideData {
-  id: string
-  number: number
-  title: string
-  frameId: TLShapeId
-  conversation: ConversationMessage[]
-  createdAt: Date
-  updatedAt: Date
-  thumbnailUrl?: string
-  metadata?: Record<string, unknown>
-}
+/* ------------------------------------------------------------------ */
+/* 2 ▸ State segments & helpers                                       */
+/* ------------------------------------------------------------------ */
+export type Snapshot = StoreSnapshot<TLRecord>
 
-export interface SlidesStateData {
+interface SlidesStateData {
   slides: SlideData[]
   currentSlideId: string
 }
 
-/* ===========================================================================
-   3.  Utility helpers (imported from utils directory)
-   =========================================================================== */
-
-// Utility functions are now imported from their canonical locations
-
-/* ===========================================================================
-   4.  Dexie-based Zustand storage adapter  (✨ extract to "@/lib/storage")
-   =========================================================================== */
-class HybridDB extends Dexie {
-  zustandStore!: Dexie.Table<{ id: string; value: string }, string>
-  constructor() {
-    super('hybrid-slide-canvas')
-    this.version(1).stores({ zustandStore: 'id' })
-  }
-}
-const db = new HybridDB()
-
-const dexieStorage: StateStorage = {
-  getItem: async (key) => (await db.zustandStore.get(key))?.value ?? null,
-  setItem: async (key, val) => db.zustandStore.put({ id: key, value: val }),
-  removeItem: async (key) => db.zustandStore.delete(key),
+interface SlidesEphemeral {
+  editor: Editor | null
+  /** heavy snapshots live here, NOT in the draft */
+  snapshots: Map<string, Snapshot>
 }
 
-/* ===========================================================================
-   5.  Initial-state factory
-   =========================================================================== */
-const makeInitialSlide = (id = 'slide-1'): SlideData => ({
-  id,
-  number: 1,
-  title: 'Welcome to Hybrid Slide Canvas',
-  frameId: createUniqueShapeId(),
-  conversation: [createWelcomeMessage()],
+interface SlidesActions {
+  initEditor: (e: Editor) => void
+  addSlide: () => void
+  deleteSlide: (id: string) => void
+  setCurrentSlide: (id: string) => void
+  duplicateSlide: (id: string) => void
+  /** capture current editor state into the snapshot map */
+  saveSnapshot: () => void
+}
+
+export type SlidesState = SlidesStateData & SlidesEphemeral & SlidesActions
+
+/*  ----------  lightweight slide factory  ---------- */
+const makeLightSlide = (n: number): SlideData => ({
+  id: `slide-${nanoid(6)}`,
+  number: n,
+  title: `Slide ${n}`,
+  snapshotId: nanoid(10),
   createdAt: new Date(),
   updatedAt: new Date(),
-  metadata: { isInitial: true },
-  thumbnailUrl: '/placeholder.png',
 })
 
-const initialState: SlidesStateData = {
-  slides: [makeInitialSlide()],
-  currentSlideId: 'slide-1',
-}
+const lightWelcome = deepFreeze(makeLightSlide(1))
 
-/* ===========================================================================
-   6.  Slides store – state + actions
-   =========================================================================== */
-export interface SlidesState extends SlidesStateData {
-  addFrameSlide: (editor: Editor) => void
-  deleteSlide: (slideId: string, editor?: Editor) => void
-  setCurrentSlide: (id: string, editor?: Editor) => void
-  reorderSlides: (fromIdx: number, toIdx: number) => void
-  duplicateSlide: (slideId: string) => void
-  updateSlideMetadata: (slideId: string, title: string) => void
-  addMessage: (slideId: string, role: MessageRole, content: string) => void
-  reset: () => void
-}
+/* ------------------------------------------------------------------ */
+/* 3 ▸ Logic – only mutates SlidesStateData (Immer sees this)         */
+/* ------------------------------------------------------------------ */
+const logic = (set, get): SlidesActions => ({
+  /* connect editor once */
+  initEditor: (e) => set({ editor: e }),
 
-const logic = (set: any, get: any): SlidesState => ({
-  ...initialState,
+  /* sync the in-memory snapshot map with the current editor store */
+  saveSnapshot: () => {
+    const ed = get().editor
+    if (!ed) return
+    const slide = get().slides.find(s => s.id === get().currentSlideId)
+    if (!slide) return
+    get().snapshots.set(slide.snapshotId, ed.store.getSnapshot())
+  },
 
-  addFrameSlide: (editor) =>
-    set((draft: Draft<SlidesState>) => {
+  addSlide: () =>
+    set((draft: SlidesStateData) => {
       const idx = draft.slides.length + 1
-      const id = `slide-${nanoid(8)}`
-      const frameId = createUniqueShapeId() as TLShapeId
-
-      draft.slides.push({
-        ...makeInitialSlide(id),
-        number: idx,
-        frameId,
-        title: `Slide ${idx}`,
-      })
-      draft.currentSlideId = id
-
-      editor?.createShapes?.([
-        {
-          id: frameId as TLShapeId,
-          type: 'frame',
-          x: idx * 1200,
-          y: 0,
-          props: { w: 960, h: 540, name: `Slide ${idx}` },
-        },
-      ])
-
-      editor?.select?.(frameId)
+      const light = makeLightSlide(idx)
+      draft.slides.push(light)
+      draft.currentSlideId = light.id
     }),
 
-  deleteSlide: (slideId, editor) =>
-    set((draft: Draft<SlidesState>) => {
+  deleteSlide: (id) =>
+    set((draft: SlidesStateData) => {
       if (draft.slides.length === 1) return
-      const idx = draft.slides.findIndex((s) => s.id === slideId)
-      if (idx === -1) return
-      const [{ frameId }] = draft.slides.splice(idx, 1)
+      draft.slides = draft.slides.filter(s => s.id !== id)
       draft.slides.forEach((s, i) => (s.number = i + 1))
-      if (draft.currentSlideId === slideId) draft.currentSlideId = draft.slides[Math.max(0, idx - 1)].id
-      editor?.deleteShapes?.([frameId])
+      if (draft.currentSlideId === id) draft.currentSlideId = draft.slides[0].id
     }),
 
-  setCurrentSlide: (id, editor) =>
-    set((draft: Draft<SlidesState>) => {
-      if (!draft.slides.some((s) => s.id === id)) return
+  setCurrentSlide: (id) => {
+    /* persist current snapshot then switch */
+    get().saveSnapshot()
+
+    set((draft: SlidesStateData) => {
+      if (!draft.slides.some(s => s.id === id)) return
       draft.currentSlideId = id
-      const slide = draft.slides.find((s) => s.id === id)!
-      if (slide.frameId) {
-        editor?.select?.([slide.frameId] as any)
-      }
-    }),
+    })
 
-  reorderSlides: (from, to) =>
-    set((draft: Draft<SlidesState>) => {
-      const [s] = draft.slides.splice(from, 1)
-      draft.slides.splice(to, 0, s)
-      draft.slides.forEach((sl, i) => (sl.number = i + 1))
-    }),
+    /* load new snapshot */
+    const slide = get().slides.find(s => s.id === id)!
+    const snap = get().snapshots.get(slide.snapshotId)
+    snap && get().editor?.store.loadSnapshot(snap)
+  },
 
-  duplicateSlide: (slideId) =>
-    set((draft: Draft<SlidesState>) => {
-      const src = draft.slides.find((s) => s.id === slideId)
+  duplicateSlide: (id) => {
+    get().saveSnapshot()
+
+    set((draft: SlidesStateData) => {
+      const src = draft.slides.find(s => s.id === id)
       if (!src) return
-      const id = `slide-${nanoid(8)}`
-      const frameId = createUniqueShapeId() as TLShapeId
-      const insertAt = draft.slides.findIndex((s) => s.id === slideId) + 1
-      draft.slides.splice(insertAt, 0, {
+      const dup: SlideData = {
         ...src,
-        id,
-        frameId,
+        id: `slide-${nanoid(6)}`,
+        snapshotId: nanoid(10),
+        number: draft.slides.length + 1,
         title: `${src.title} (Copy)`,
         createdAt: new Date(),
         updatedAt: new Date(),
-        conversation: [],
-        metadata: { ...src.metadata, duplicatedFrom: slideId },
-        number: 0,
-      })
-      draft.slides.forEach((sl, i) => (sl.number = i + 1))
-      draft.currentSlideId = id
-    }),
-
-  updateSlideMetadata: (slideId, title) =>
-    set((draft: Draft<SlidesState>) => {
-      const s = draft.slides.find((sl) => sl.id === slideId)
-      if (s) {
-        s.title = title
-        s.updatedAt = new Date()
       }
-    }),
+      draft.slides.push(dup)
+      draft.currentSlideId = dup.id
+    })
 
-  addMessage: (slideId, role, content) =>
-    set((draft: Draft<SlidesState>) => {
-      const s = draft.slides.find((sl) => sl.id === slideId)
-      if (!s) return
-      s.conversation.push({ id: nanoid(), role, content, timestamp: new Date() })
-      s.updatedAt = new Date()
-    }),
-
-  reset: () => set((state: SlidesState) => ({ ...state, ...structuredClone(initialState) })),
+    /* copy snapshot in the map */
+    const srcSnap = get().snapshots.get(
+      get().slides.find(s => s.id === id)!.snapshotId
+    )
+    if (srcSnap) {
+      const dupSlide = get().slides.find(s => s.title.endsWith('(Copy)'))!
+      get().snapshots.set(dupSlide.snapshotId, structuredClone(srcSnap) as Snapshot)
+    }
+  },
 })
 
-/* ===========================================================================
-   7.  Persist config & store creation
-   =========================================================================== */
-const store = create<SlidesState>()(
-  // dev-only deep freeze catches accidental mutations _after_ Immer
-  ((config) =>
-    (set, get, api) =>
-      config(
-        (fn, replace) =>
-          set(
-            (state) => (import.meta.env.DEV ? deepFreeze(typeof fn === 'function' ? fn(state) : fn) : fn),
-            replace,
-          ),
-        get,
-        api,
-      ))(
-    persist(
-      immer(logic),
-      {
-        name: 'slides-store',
-        partialize: (s): SlidesStateData => ({
-          slides: s.slides,
-          currentSlideId: s.currentSlideId,
-        }),
-        merge: (saved, cur) => {
-          if (!saved) return cur
-          const data = saved as SlidesStateData
-          data.slides.forEach((sl) => {
-            sl.createdAt = new Date(sl.createdAt)
-            sl.updatedAt = new Date(sl.updatedAt)
-            sl.conversation.forEach((m) => (m.timestamp = new Date(m.timestamp)))
-          })
-          return { ...cur, ...data }
-        },
-        storage: createJSONStorage(() => dexieStorage),
-      },
-    ),
-  ),
+/* ------------------------------------------------------------------ */
+/* 4 ▸ store creation                                                 */
+/* ------------------------------------------------------------------ */
+export const useSlidesStore = create<SlidesState>()(
+  persist(
+    immer<SlidesState>((set, get, api) => ({
+      /* ─ data ─ */          slides: [lightWelcome], currentSlideId: lightWelcome.id,
+      /* ─ mem ─  */          editor: null, snapshots: new Map(),
+      /* ─ acts ─ */          ...logic(set, get),
+    })),
+    {
+      name: 'slides',                    // Dexie key
+      storage: createJSONStorage(() => dexieStorage),
+      /** only serialise the lightweight data */
+      partialize: ({ slides, currentSlideId }): SlidesStateData => ({
+        slides,
+        currentSlideId,
+      }),
+      /* restore dates */
+      merge: (saved, cur) => ({
+        ...cur,
+        ...(saved as SlidesStateData),
+        slides: (saved as SlidesStateData).slides.map(s => ({
+          ...s,
+          createdAt: new Date(s.createdAt),
+          updatedAt: new Date(s.updatedAt),
+        })),
+      }),
+    }
+  )
 )
-
-export const useSlidesStore = store
-export const slidesStore = store // For tests and direct access
-
-/* eslint-disable-next-line import/no-default-export */
-export default store
