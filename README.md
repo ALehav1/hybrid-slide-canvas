@@ -16,12 +16,19 @@ Hybrid Slide Canvas is a lightweight React 19 + Vite application that fuses a tl
 - **Architecture**: Stable three-panel layout (`LeftSidebar`, `CanvasRegion`, `RightSidebar`) with context-based state propagation.
 - **State Management**: Zustand with Immer for predictable state, persisted to IndexedDB via a custom `dexieStorage` middleware.
 - **Undo/Redo**: A robust, custom multi-origin undo/redo system (`HistoryManager`) is fully implemented and tested, separating `user` and `ai` action histories.
+- **Free-Draw Pen**: A free-draw pen tool is now available in the toolbar, allowing for freehand sketching on the canvas.
 - **AI Integration**: The AI chat panel is fully functional, using OpenAI's API to translate natural language into tldraw shapes.
 - **Testing**: The test suite is stable. A canonical, documented pattern for testing Zustand-connected components is enforced across the codebase.
 - **Dependencies**: All Y.js-related code has been removed. The project has a clean, minimal dependency tree.
-- **Next Up**: Begin MVP Phase 2: Implementing a free-draw pen tool.
+- **Next Up**: Begin MVP Phase 3: Export functionality (PNG/PDF).
 
 ## Changelog
+
+### 2025-07-04 — MVP Phase 2: Free-Draw Pen Implementation
+
+- **Added Free-Draw Tool**: Implemented a complete free-draw pen tool, including a custom shape (`FreeDrawShapeUtil`), a stateful tool (`FreeDrawTool`), and a toolbar button for activation.
+- **Updated Toolbar**: The main toolbar now includes a "Pen" button that activates the free-draw tool and provides visual feedback when active.
+- **Integrated with Canvas**: The new shape and tool are correctly registered with the `tldraw` editor instance in `CanvasSlide.tsx`.
 
 ### 2025-07-04 — Toolbar Test Suite Refactor & Documentation Update
 
@@ -102,40 +109,13 @@ hybrid-slide-canvas/
 ## Key File Responsibilities
 
 - **`src/App.tsx`**: The root component. Assembles the main three-panel UI layout and provides global contexts.
-- **`src/main.tsx`**: The application's entry point. Renders the React 19 root and mounts the `<App />` component.
-
-### `components/`
-
-- **`CanvasRegion.tsx`**: Manages the core `tldraw` editor instance and provides it to child components via `EditorContext`.
-- **`Toolbar.tsx`**: The main UI toolbar. Contains undo/redo buttons that use the `useHistoryManager` hook to interact with the multi-origin history system. It reads the `canUndo` and `canRedo` states from `useHistoryStore` to enable/disable the buttons and calls the `undo('user')` and `redo('user')` methods from the `useHistoryManager` hook.
-- **`ConversationProvider.tsx`**: A context provider that centralizes all chat logic, state management, and interaction with the AI service.
-
-### `lib/history/`
-
-- **`HistoryManager.ts`**: A class that listens to `tldraw` store changes, tags shapes with their origin (`user`, `ai`), and synchronizes history with the `useHistoryStore`.
-- **`HistoryManager.ts`**: The core class for the multi-origin undo/redo system. It listens to `tldraw` store changes, determines the action's origin, and uses the `useHistoryStore` to manage the undo/redo stacks.
-- **`useHistoryStore.ts`**: A Zustand store that holds the state for the history system, including the undo and redo stacks for each origin (`user`, `ai`). It exposes actions like `addEntry`, `undo`, and `redo`.
-- **`useHistoryManager.ts`**: A React hook that creates and memoizes an instance of the `HistoryManager`, connecting it to the active `tldraw` editor instance. This is the primary hook used by UI components to perform undo/redo actions.
-
-### `lib/storage/`
-
-- **`dexieStorage.ts`**: A generic adapter that allows any Zustand store to persist its state to IndexedDB via Dexie.js.
-
-### `lib/middleware/`
-
-- **`immerMiddleware.ts`**: A custom Zustand middleware for integrating Immer, enabling safe and simple immutable state updates.
-- **`types.ts`**: Provides type definitions and helper types for enhancing Zustand stores with middleware while maintaining full type safety.
-
-### `lib/utils/`
-
-- **`conversationUtils.ts`**: Provides helper functions for chat, such as creating a default welcome message for a new conversation.
-- **`deepFreeze.ts`**: A development utility to prevent accidental state mutations by recursively freezing objects.
-- **`logging.ts`**: Provides a simple, standardized logging wrapper for consistent console output.
-
-### `__tests__/`
-
-- **`test-utils/mocks/`**: A centralized directory for all mocks (e.g., `tldraw`, `dexie`, `api`) to ensure consistency and reusability across the test suite.
-- **`lib/test/test-utils.ts`**: Provides a custom `renderWithContext` function and other test utilities to support our canonical testing pattern.
+- **`src/components/CanvasSlide.tsx`**: Renders a single `tldraw` instance. It is responsible for registering all custom shapes and tools (like the `FreeDrawShapeUtil` and `FreeDrawTool`) with the editor.
+- **`src/components/Toolbar.tsx`**: The main application toolbar. Provides global controls like multi-origin undo/redo and tool selection buttons, including the new free-draw pen.
+- **`src/lib/shapes/FreeDrawShapeUtil.ts`**: The `ShapeUtil` for the free-draw shape. It defines the shape's geometry, rendering logic (including the critical `toSvg` method for exports), and user interactions.
+- **`src/lib/tools/FreeDrawTool.ts`**: The `StateNode` (state machine) for the free-draw tool. It manages the tool's state (e.g., `idle`, `pointing`, `drawing`) and handles user input events to create and update free-draw shapes.
+- **`src/lib/history/HistoryManager.ts`**: The core class for the multi-origin undo/redo system. It listens to `tldraw` store changes, determines the action's origin, and uses the `useHistoryStore` to manage the undo/redo stacks.
+- **`src/lib/history/useHistoryStore.ts`**: A Zustand store that holds the state for the history system, including the undo and redo stacks for each origin (`user`, `ai`).
+- **`src/lib/history/useHistoryManager.ts`**: A React hook that creates and memoizes an instance of the `HistoryManager`, connecting it to the active `tldraw` editor instance.
 
 ## Architecture & Patterns
 
@@ -170,6 +150,35 @@ graph TD
     A -- "Receives reactive state" --> B
 ```
 
+### Free-Draw Pen
+
+The free-draw pen allows users to create freehand drawings on the canvas. It uses the `perfect-freehand` library for smooth, pressure-sensitive strokes.
+
+**Logic Flow:**
+
+```mermaid
+graph TD
+    subgraph UI Layer
+        A[Toolbar Component]
+    end
+
+    subgraph TLDraw Core
+        B[Tldraw Component]
+        C[Editor Instance]
+    end
+
+    subgraph Custom Implementation
+        D[FreeDrawTool.ts]
+        E[FreeDrawShapeUtil.ts]
+    end
+
+    A -- "Selects 'free-draw' tool" --> C
+    B -- "Passes events (onPointerDown, etc.)" --> D
+    C -- "Sets current tool" --> D
+    D -- "Creates/updates shape" --> C
+    C -- "Renders shape using" --> E
+```
+
 ### Zustand Store Testing Pattern
 
 We have adopted a canonical pattern for testing components that consume Zustand stores to ensure reliability and prevent common pitfalls.
@@ -177,7 +186,7 @@ We have adopted a canonical pattern for testing components that consume Zustand 
 - **Use the Real Store**: Tests import and use the actual store module, not a mock. This ensures the test runs against the identical middleware chain (`immer`, `dexieStorage`).
 - **Reset State in `beforeEach`**: In the `beforeEach` block, the store is reset to a clean initial state using `store.setState(initialState, true)`. The `true` argument forces a complete state replacement, preventing state leakage between tests.
 - **Mock Only External Dependencies**: Only external modules (like API clients or other hooks like `useHistoryManager`) are mocked. The store itself remains real.
-- **Wrap State Updates in `act()`**: Direct store mutations within tests are wrapped in `act()` from `@testing-library/react` to ensure component re-renders are processed before assertions.
+- **Wrap State Updates in `act()`**: Direct store mutations within tests are wrapped in `act()` from `@testing-g/react` to ensure component re-renders are processed before assertions.
 
 ## 🚀 Quick Start
 

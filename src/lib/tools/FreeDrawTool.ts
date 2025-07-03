@@ -1,90 +1,141 @@
-import { StateNode, Vec } from 'tldraw'
-import type { TLPointerEventInfo, TLShapeId } from 'tldraw'
-import { simplifyStroke, type IFreeDrawShape } from '@/lib/shapes/FreeDrawShapeUtil.tsx'
+import {
+	StateNode,
+	Vec,
+	createShapeId,
+	type TLPointerEventInfo,
+	type TLShapeId,
+} from 'tldraw'
+import { simplifyStroke, type IFreeDrawShape } from '@/lib/shapes/FreeDrawShapeUtil'
+import throttle from 'lodash.throttle'
 
-const SIMPLIFY_TOLERANCE = 1
+const SIMPLIFY_TOLERANCE = 0.75
 
 export class FreeDrawTool extends StateNode {
-  static override id = 'free-draw'
-  static override initial = 'idle'
-  
-  static override children() {
-    return [Idle, Drawing]
-  }
+	static override id = 'free-draw'
+	static override initial = 'idle'
+
+	static override children() {
+		return [Idle, Drawing]
+	}
 }
 
 class Idle extends StateNode {
-  static override id = 'idle'
+	static override id = 'idle'
 
-  override onEnter() {
-    this.editor.setCursor({ type: 'cross', rotation: 0 })
-  }
+	override onEnter = () => {
+		this.editor.setCursor({ type: 'cross', rotation: 0 })
+	}
 
-  override onPointerDown = (info: TLPointerEventInfo) => {
-    const { currentPagePoint } = this.editor.inputs
+	override onPointerDown = (info: TLPointerEventInfo) => {
+		const { currentPagePoint } = this.editor.inputs
+		// A type assertion is used here to work around a type mismatch for `currentPressure`.
+		const currentPressure = (this.editor.inputs as any).currentPressure ?? 0.5
+		const shapeId = createShapeId()
 
-    const shape = this.editor.createShape<IFreeDrawShape>({
-      type: 'free-draw',
-      x: currentPagePoint.x,
-      y: currentPagePoint.y,
-      props: { points: [[0, 0]], opacity: 1 }, // editor fills color & size
-      meta: { createdBy: 'user' },
-    })
+		this.editor.createShape<IFreeDrawShape>({
+			id: shapeId,
+			type: 'free-draw',
+			x: currentPagePoint.x,
+			y: currentPagePoint.y,
+			props: {
+				points: [[0, 0, currentPressure]],
+				opacity: 1,
+				// These props will be overridden by the user's default styles
+				color: 'black',
+				size: 'm',
+			},
+			meta: {
+				createdBy: 'user',
+			},
+		})
 
-    return this.parent.transition('drawing', { ...info, shapeId: shape.id })
-  }
+		this.parent.transition('drawing', { ...info, shapeId })
+	}
 }
 
 type DrawingInfo = TLPointerEventInfo & {
-  shapeId: TLShapeId
+	shapeId: TLShapeId
 }
 
 class Drawing extends StateNode {
-  static override id = 'drawing'
-  
-  shapeId!: TLShapeId
-  points: number[][] = []
+	static override id = 'drawing'
 
-  override onEnter = (info: DrawingInfo) => {
-    this.shapeId = info.shapeId
-    this.points = [[0, 0]]
-  }
+	private shapeId!: TLShapeId
+	private points: number[][] = []
 
-  override onPointerMove = () => {
-    const { currentPagePoint } = this.editor.inputs
-    const shape = this.editor.getShape<IFreeDrawShape>(this.shapeId)
-    
-    if (!shape) return
+	private updateShape = throttle(() => {
+		if (!this.isActive) return
+		this.editor.updateShape<IFreeDrawShape>({
+			id: this.shapeId,
+			type: 'free-draw',
+			props: {
+				points: this.points,
+			},
+		})
+	}, 16)
 
-    // ✅ Correct coordinate transformation (no "new Vec")
-    const localPoint = Vec.Sub(currentPagePoint, { x: shape.x, y: shape.y })
-    this.points.push([localPoint.x, localPoint.y])
+	override onEnter = (info: DrawingInfo) => {
+		this.shapeId = info.shapeId
+		const shape = this.editor.getShape<IFreeDrawShape>(this.shapeId)
+		if (!shape) {
+			this.parent.transition('idle')
+			return
+		}
 
-    this.editor.updateShape<IFreeDrawShape>({
-      id: this.shapeId,
-      type: 'free-draw',
-      props: {
-        points: this.points,
-      },
-    })
-  }
+		this.points = shape.props.points
 
-  override onPointerUp = () => {
-    const simplified = simplifyStroke(this.points, SIMPLIFY_TOLERANCE)
-    
-    this.editor.updateShape<IFreeDrawShape>({
-      id: this.shapeId,
-      type: 'free-draw',
-      props: {
-        points: simplified,
-      },
-    })
+		this.editor.setCursor({ type: 'cross', rotation: 0 })
+		this.onPointerMove()
+	}
 
-    return this.parent.transition('idle')
-  }
+	override onPointerMove = () => {
+		const { currentPagePoint } = this.editor.inputs
+		const currentPressure = (this.editor.inputs as any).currentPressure ?? 0.5
+		const shape = this.editor.getShape<IFreeDrawShape>(this.shapeId)
+		if (!shape) return
 
-  override onCancel = () => {
-    this.editor.deleteShapes([this.shapeId])
-    return this.parent.transition('idle')
-  }
+		const { x, y } = Vec.Sub(currentPagePoint, { x: shape.x, y: shape.y })
+		this.points.push([x, y, currentPressure])
+
+		this.updateShape()
+	}
+
+	private complete() {
+		this.updateShape.flush()
+
+		const shape = this.editor.getShape<IFreeDrawShape>(this.shapeId)
+		if (!shape) {
+			this.parent.transition('idle')
+			return
+		}
+
+		const simplifiedPoints = simplifyStroke(this.points, SIMPLIFY_TOLERANCE)
+
+		this.editor.updateShape<IFreeDrawShape>({
+			id: this.shapeId,
+			type: 'free-draw',
+			props: {
+				points: simplifiedPoints,
+			},
+		})
+
+		this.parent.transition('idle')
+	}
+
+	override onPointerUp = () => {
+		this.complete()
+	}
+
+	override onComplete = () => {
+		this.complete()
+	}
+
+	override onCancel = () => {
+		this.editor.deleteShapes([this.shapeId])
+		this.parent.transition('idle')
+	}
+
+	override onExit = () => {
+		this.updateShape.cancel()
+	}
 }
