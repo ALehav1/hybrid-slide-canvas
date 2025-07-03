@@ -1,5 +1,7 @@
 import { Suspense } from 'react';
-import { Tldraw, type Editor, type TLComponents } from '@tldraw/tldraw';
+import { Tldraw, type Editor, type TLComponents, type TLStore } from '@tldraw/tldraw';
+import { FreeDrawShapeUtil } from '../lib/shapes/FreeDrawShapeUtil.tsx';
+import { FreeDrawTool } from '@/lib/tools/FreeDrawTool';
 import { applyTheme } from '../lib/theme';
 
 // Loading fallback component for TLDraw canvas
@@ -14,7 +16,8 @@ const CanvasLoadingFallback = () => (
 
 type Props = {
   slideId: string;
-  onEditorMount: (editor: Editor) => void;
+  store: TLStore;
+  onMount: (editor: Editor) => void;
   className?: string;
 };
 
@@ -32,16 +35,16 @@ const customComponents: Partial<TLComponents> = {
  * Canvas slide component that renders a TLDraw canvas with proper error handling and lazy loading
  * Uses TLDraw's official components API instead of children for UI customization
  */
-export const CanvasSlide: React.FC<Props> = ({ slideId, onEditorMount, className = '' }) => {
+export const CanvasSlide: React.FC<Props> = ({ slideId: _slideId, store, onMount, className = '' }) => {
   // Use React 19's Suspense for async loading of the canvas
   return (
     <Suspense fallback={<CanvasLoadingFallback />}>
       <Tldraw
-        persistenceKey={slideId}
+        store={store}
         onMount={(editor) => {
           // Enhance with error handling
           try {
-            onEditorMount(editor); // Pass the editor instance up to the parent
+            onMount(editor); // Pass the editor instance up to the parent
             applyTheme(editor);
           } catch (error) {
             console.error('Error mounting TLDraw editor:', error);
@@ -50,6 +53,8 @@ export const CanvasSlide: React.FC<Props> = ({ slideId, onEditorMount, className
         hideUi
         className={`h-full w-full ${className}`}
         components={customComponents}
+        shapeUtils={[FreeDrawShapeUtil]}
+        tools={[FreeDrawTool]}
       />
     </Suspense>
   );

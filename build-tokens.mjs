@@ -32,7 +32,7 @@ function transformTokens(tokens, rootTokens) {
 async function buildTokens() {
   try {
     const tokensPath = path.join(process.cwd(), 'tokens', 'tokens.json');
-    const outputPath = path.join(process.cwd(), 'tokens', 'build', 'tailwind.js');
+    const outputPath = path.join(process.cwd(), 'tokens', 'build', 'tailwind.cjs');
     
     // Read tokens
     const tokensRaw = fs.readFileSync(tokensPath, 'utf8');

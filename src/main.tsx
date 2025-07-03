@@ -12,7 +12,7 @@ import { logger } from './lib/utils/logging'
 // Initialize logger with appropriate level based on environment
 logger.setLevel(import.meta.env.DEV ? 'debug' : 'warn')
 
-// Production entry point with ConversationProvider
+// Main app rendering
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConversationProvider>

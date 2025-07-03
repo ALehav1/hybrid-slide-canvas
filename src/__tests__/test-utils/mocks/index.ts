@@ -13,3 +13,4 @@ export { default as mockOpenAI } from './openaiClient';
 
 // Re-export any existing mocks
 export { mockEditor } from './tldraw';
+export * from './logging';

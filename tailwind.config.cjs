@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-const tokens = require('./tokens/build/tailwind');
+const tokens = require('./tokens/build/tailwind.cjs');
 
 module.exports = {
   content: [
@@ -8,27 +8,24 @@ module.exports = {
   ],
   theme: {
     extend: {
-      // Design tokens from our token system
       colors: tokens.color,
       spacing: tokens.spacing,
       borderRadius: tokens.borderRadius,
       boxShadow: tokens.shadow,
       transitionDuration: tokens.transition,
-      // Override specific layout dimensions from tokens
       gridTemplateRows: {
-        'hybrid-layout': '60px 1fr auto', // TopNav | CanvasRegion | BottomPanel
+        'hybrid-layout': '60px 1fr auto',
       },
       width: {
-        'sidebar': '288px',      // Exact Figma/Canva sidebar width
-        'thumbnail-rail': '112px', // Exact thumbnail rail width
+        'sidebar': '288px',
+        'thumbnail-rail': '112px',
       },
       height: {
-        'header': '60px',        // Header height
+        'header': '60px',
       }
     },
   },
   plugins: [
-    // Add custom surface plugin for proper component styling
     function({ addUtilities }) {
       addUtilities({
         '.surface-elevated': {

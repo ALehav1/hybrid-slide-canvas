@@ -2,14 +2,12 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import { act } from '@testing-library/react';
 import Dexie from 'dexie';
-import slidesStore, { type SlidesStateData } from '../slidesStore';
+import slidesStore from '../slidesStore';
 
-// Define a type for the store's state snapshot including all actions
-// This is the correct way to type Zustand store state+actions in TypeScript
-type SlidesSnapshot = ReturnType<typeof slidesStore.getState>;
+
 
 // IMPORTANT: Actions in Zustand stores should always be accessed via getState()
 // Example: slidesStore.getState().reset() NOT slidesStore.reset()
@@ -26,20 +24,13 @@ vi.mock('nanoid', () => ({
 }));
 
 // Mock console methods to prevent noise during tests
-const originalConsole = {
-  debug: console.debug,
-  error: console.error,
-  info: console.info,
-  warn: console.warn
-};
 
 console.debug = vi.fn();
 console.error = vi.fn();
 console.info = vi.fn();
 console.warn = vi.fn();
 
-// Helper to create a valid TLShapeId (used in specific test cases)
-const createShapeId = (id: string): TLShapeId => id as TLShapeId;
+
 
 // Helper to create a mock editor
 function createMockEditor(): Editor {
@@ -123,6 +114,9 @@ function createMockEditor(): Editor {
 let mockEditor: Editor;
 
 beforeEach(async () => {
+  // Enable fake timers for all tests in this suite
+  vi.useFakeTimers();
+
   // Reset mocks between tests
   vi.clearAllMocks();
   
@@ -145,9 +139,11 @@ beforeEach(async () => {
 describe('slidesStore with Dexie persistence', () => {
   // initialState is defined at module scope above
   
-  afterEach(() => {
+  afterEach(async () => {
     // Restore mocks
     vi.restoreAllMocks();
+    // Ensure all debounced state persistence is flushed
+    await vi.runAllTimersAsync();
   });
 
   it('should initialize with default state', () => {
@@ -486,7 +482,7 @@ describe('slidesStore with Dexie persistence', () => {
     expect(mockEditor.createShapes).toHaveBeenCalledTimes(2);
     
     // Get all createShapes calls and check that they created slides at increasing x positions
-    const calls = (mockEditor.createShapes as vi.Mock).mock.calls;
+    const calls = (mockEditor.createShapes as Mock).mock.calls;
     const firstCallXPosition = calls[0][0][0].x;
     const secondCallXPosition = calls[1][0][0].x;
     

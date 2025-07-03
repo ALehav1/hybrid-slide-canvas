@@ -1,4 +1,5 @@
 import type { LibraryItem } from './types';
+export type { LibraryItem };
 
 export const basicLibrary: LibraryItem[] = [
   {

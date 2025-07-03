@@ -83,6 +83,8 @@ describe('ChatPanel', () => {
   });
 
   beforeEach(() => {
+    vi.resetModules();
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockEditor = {
       batch: (cb: () => void) => cb(),
@@ -97,8 +99,10 @@ describe('ChatPanel', () => {
     (useSlidesStore as unknown as Mock).mockReturnValue({ currentSlideId: 'slide-1' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
+    vi.restoreAllMocks();
+    await vi.runAllTimersAsync();
   });
 
   test('renders correctly and displays placeholder', () => {

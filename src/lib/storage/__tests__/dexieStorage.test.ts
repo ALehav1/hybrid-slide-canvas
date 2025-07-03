@@ -24,6 +24,8 @@ describe('DexieStorage', () => {
     if (db.isOpen()) {
       await db.close();
     }
+    // Ensure all async Dexie ops complete and timers are cleared.
+    await vi.runAllTimersAsync();
   });
 
   test('setItem persists a record and getItem retrieves it', async () => {
@@ -31,17 +33,17 @@ describe('DexieStorage', () => {
     // Zustand's storage interface expects a `StorageValue` object with a `state` property.
     const value = { state: { data: 'test-value' } };
 
-    await storage.setItem(key, value);
-    const retrievedValue = await storage.getItem(key);
+    await storage!.setItem(key, value);
+    const retrievedValue = await storage!.getItem(key);
 
     expect(retrievedValue).toEqual(value);
   });
 
   test('removeItem deletes data', async () => {
     const key = 'delete-me';
-    await storage.setItem(key, { state: { data: 'to-be-deleted' } });
-    await storage.removeItem(key);
-    const retrievedValue = await storage.getItem(key);
+    await storage!.setItem(key, { state: { data: 'to-be-deleted' } });
+    await storage!.removeItem(key);
+    const retrievedValue = await storage!.getItem(key);
 
     expect(retrievedValue).toBeNull();
   });
@@ -62,12 +64,14 @@ describe('DexieStorage with keyPrefix', () => {
     if (db.isOpen()) {
       await db.close();
     }
+    // Ensure all async Dexie ops complete and timers are cleared.
+    await vi.runAllTimersAsync();
   });
 
   test('applies the user-defined key prefix', async () => {
     const key = 'test-key';
     const value = { state: { data: 1 } };
-    await storage.setItem(key, value);
+    await storage!.setItem(key, value);
 
     // Verify directly using a raw Dexie connection.
     const rawDb = new Dexie(testDbName);

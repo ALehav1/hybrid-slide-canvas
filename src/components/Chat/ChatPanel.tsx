@@ -122,13 +122,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
     <section
       data-testid="chat-panel"
       className="
-    absolute right-5 top-5
-    w-[350px] max-h-[600px]
-    bg-white/95 shadow-lg rounded-lg
+    w-full h-full bg-white
     flex flex-col
-    z-[1000]
-    lg:right-5 lg:top-5
-    sm:right-3 sm:top-3 sm:w-[90vw] sm:max-h-[80vh]
   "
     >
       {/* Message list with Suspense boundary */}

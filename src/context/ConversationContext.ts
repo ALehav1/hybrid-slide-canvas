@@ -13,7 +13,7 @@ export interface ConversationMessage {
 export interface SlideConversation {
   slideId: string;
   messages: ConversationMessage[];
-  lastModified: number;
+  lastModified: Date;
 }
 
 /**

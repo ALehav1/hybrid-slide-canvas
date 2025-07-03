@@ -1,37 +1,41 @@
 import { useState, useCallback, useTransition } from "react";
-import { basicLibrary } from "../lib/shapeLibraries/basic";
-import type { Editor } from "@tldraw/tldraw";
-
-type LibraryPanelProps = {
-  editor: Editor | null;
-};
+import { useEditor } from "@tldraw/tldraw";
+import { basicLibrary } from '@/lib/shapeLibraries/basic';
 
 /**
  * Library panel component that displays available shapes and templates
  * Enhanced with React 19 patterns for better UX during shape creation
  */
-export const LibraryPanel = ({ editor }: LibraryPanelProps) => {
+export const LibraryPanel = () => {
+  const editor = useEditor();
+
   // Track the last clicked item for better UX feedback
   const [lastClickedItemId, setLastClickedItemId] = useState<string | null>(null);
   // Use transition to prevent UI blocking during shape creation
   const [isPending, startTransition] = useTransition();
 
   // Handle shape creation with improved error handling
-  const handleCreateShape = useCallback((item: typeof basicLibrary[number]) => {
-    if (!editor) return;
-    
-    setLastClickedItemId(item.id);
-    startTransition(() => {
+  const handleCreateShape = useCallback(
+    async (item: typeof basicLibrary[number]) => {
+      if (!editor) return;
+
+      // Use a transition for the non-urgent state update
+      startTransition(() => {
+        setLastClickedItemId(item.id);
+      });
+
       try {
-        item.factory(editor);
+        // The factory call is an async side effect and should not be inside the transition
+        await item.factory(editor);
       } catch (error) {
         console.error(`Error creating shape ${item.name}:`, error);
       } finally {
         // Clear the clicked state after a delay
         setTimeout(() => setLastClickedItemId(null), 500);
       }
-    });
-  }, [editor]);
+    },
+    [editor, startTransition]
+  );
 
   return (
     <div className="flex-1 overflow-y-auto p-3">
