@@ -5,7 +5,7 @@
  * history entries with origin-based categorization.
  */
 
-import type { StoreApi, type UseBoundStore } from 'zustand';
+import type { StoreApi, UseBoundStore } from 'zustand';
 
 /**
  * Origin types for tracking the source of changes

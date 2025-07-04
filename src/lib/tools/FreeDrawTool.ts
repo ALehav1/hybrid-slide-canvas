@@ -4,7 +4,7 @@ import {
 	createShapeId,
 	type TLPointerEventInfo,
 	type TLShapeId,
-} from 'tldraw'
+} from '@tldraw/tldraw'
 import { simplifyStroke, type IFreeDrawShape } from '@/lib/shapes/FreeDrawShapeUtil'
 import throttle from 'lodash.throttle'
 
@@ -64,7 +64,7 @@ class Drawing extends StateNode {
 	private points: number[][] = []
 
 	private updateShape = throttle(() => {
-		if (!this.isActive) return
+		if (!this.getIsActive()) return
 		this.editor.updateShape<IFreeDrawShape>({
 			id: this.shapeId,
 			type: 'free-draw',

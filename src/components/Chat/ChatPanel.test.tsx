@@ -1,169 +1,226 @@
-import { render, screen, cleanup } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { vi, type Mock } from 'vitest';
-import '@testing-library/jest-dom';
-import { useEditor } from '@tldraw/tldraw';
-import { ChatPanel } from './ChatPanel';
-import { ConversationContext, type ConversationContextType, type ConversationMessage } from '../../context/ConversationContext';
-import * as tldrawHelpers from '../../lib/tldrawHelpers';
+/**
+ * @vitest-environment jsdom
+ *
+ * src/components/Chat/ChatPanel.test.tsx
+ */
+import React from 'react'
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+} from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import {
+  vi,
+  describe,
+  beforeEach,
+  afterEach,
+  it,
+  expect,
+} from 'vitest'
+import '@testing-library/jest-dom'
 
+import { ChatPanel } from './ChatPanel'
 
-import type { AiAction } from './aiActions';
-import { useEnhancedSlidesStore } from '../../state/enhancedSlidesStore';
+/* ------------------------------------------------------------------ */
+/*  Real store — snapshot & reset                                     */
+/* ------------------------------------------------------------------ */
+import { useSlidesStore } from '@/state/slidesStore'
+const initialSlidesState = useSlidesStore.getState()
 
-// --- Mocks ---
-vi.mock('@tldraw/tldraw');
-vi.mock('../../lib/tldrawHelpers');
-vi.mock('../../state/enhancedSlidesStore', () => ({
-  useEnhancedSlidesStore: vi.fn(),
-}));
+/* ------------------------------------------------------------------ */
+/*  Context & helper mocks                                            */
+/* ------------------------------------------------------------------ */
+import { EditorContext } from '@/context/EditorContext'
+import * as tldrawHelpers from '@/lib/tldrawHelpers'
+import { useConversationContext } from '@/hooks/useConversationContext'
+import type { ConversationContextType } from '@/context/ConversationContext'
 
-const mockUseEditor = useEditor as Mock;
+vi.mock('@/hooks/useConversationContext')
 
+/* only spy on helper actually invoked by ChatPanel */
+const sketchSpy = vi.spyOn(tldrawHelpers, 'createSketchShape')
 
+/* ------------------------------------------------------------------ */
+/*  Minimal editor stub (typed)                                       */
+/* ------------------------------------------------------------------ */
+import type { Editor } from '@tldraw/tldraw'
 
-// A helper to render ChatPanel with a mock context provider
-const renderWithMockContext = (
-  contextValue: Partial<ConversationContextType>,
-  editor: any,
+const mockEditor = {
+  batch: (cb: () => void) => cb(),
+  createShapes: vi.fn(),
+  getShape: vi.fn(),
+  select: vi.fn(),
+  /* bounds shape isn't used in tests, provide minimal impl */
+  getViewportPageBounds: vi.fn().mockReturnValue({
+    x: 0,
+    y: 0,
+    width: 1000,
+    height: 1000,
+    center: { x: 500, y: 500 },
+  }),
+} as unknown as Editor   // <- satisfy context type
+
+/* ------------------------------------------------------------------ */
+/*  Helper: render with providers                                     */
+/* ------------------------------------------------------------------ */
+const renderWithProviders = (
+  overrides: Partial<ConversationContextType> = {},
 ) => {
-  const defaultValue: ConversationContextType = {
-    dialogInput: contextValue.dialogInput ?? '',
-    setDialogInput: contextValue.setDialogInput ?? vi.fn(),
-    isChatExpanded: contextValue.isChatExpanded ?? true,
-    setIsChatExpanded: contextValue.setIsChatExpanded ?? vi.fn(),
-    localIsLoading: contextValue.localIsLoading ?? false,
-    localError: contextValue.localError ?? null,
-    isPending: contextValue.isPending ?? false,
-    storageIsLoading: contextValue.storageIsLoading ?? false,
-    clearError: contextValue.clearError ?? vi.fn(),
-    getMessagesForSlide:
-      contextValue.getMessagesForSlide ?? vi.fn().mockReturnValue([]),
-    submitUserMessage: contextValue.submitUserMessage ?? vi.fn(),
+  const baseCtx: ConversationContextType = {
+    /* ————————————————— Conversation data ————————————————— */
+    conversations: new Map([
+      [
+        'slide-1',
+        {
+          slideId: 'slide-1',
+          messages: [
+            { role: 'user', content: 'Hello there.', timestamp: new Date() },
+            { role: 'assistant', content: 'General Kenobi!', timestamp: new Date() },
+          ],
+          lastModified: new Date(),
+        },
+      ],
+    ]),
+    conversationVersion: 1,
+
+    /* ————————————————— UI state ————————————————— */
+    dialogInput: '',
+    isChatExpanded: false,
     showSlideNavigator: false,
     slideNumberInput: '',
-    setShowSlideNavigator: vi.fn(),
-    setSlideNumberInput: vi.fn(),
+    localIsLoading: false,
     localIsTyping: false,
+    localError: null,
+    isPending: false,
+    storageIsLoading: false,
     draggedSlide: null,
     dragOverSlide: null,
-    conversations: new Map(),
-    conversationVersion: 0,
+
+    /* ————————————————— State setters ————————————————— */
+    setDialogInput: vi.fn(),
+    setIsChatExpanded: vi.fn(),
+    setShowSlideNavigator: vi.fn(),
+    setSlideNumberInput: vi.fn(),
     setLocalIsLoading: vi.fn(),
     setLocalIsTyping: vi.fn(),
     setLocalError: vi.fn(),
     setDraggedSlide: vi.fn(),
     setDragOverSlide: vi.fn(),
+
+    /* ————————————————— Conversation helpers ————————————————— */
     getConversation: vi.fn(),
     addMessage: vi.fn(),
     clearConversation: vi.fn(),
     clearAllConversations: vi.fn(),
     getConversationContext: vi.fn(),
+    getMessagesForSlide: vi.fn().mockReturnValue([]),
     getAllConversations: vi.fn(),
+
+    /* ————————————————— Convenience actions ————————————————— */
     toggleChatExpanded: vi.fn(),
     toggleSlideNavigator: vi.fn(),
+    clearError: vi.fn(),
     resetDragState: vi.fn(),
     clearInput: vi.fn(),
     resetChatState: vi.fn(),
-  };
+    submitUserMessage: vi.fn(),
+  }
+
+  ;(useConversationContext as unknown as vi.Mock).mockReturnValue({
+    ...baseCtx,
+    ...overrides,
+  })
 
   return render(
-    <ConversationContext.Provider value={defaultValue}>
-      <ChatPanel editor={editor} />
-    </ConversationContext.Provider>,
-  );
-};
+    <EditorContext.Provider value={mockEditor}>
+      <ChatPanel />
+    </EditorContext.Provider>,
+  )
+}
 
+/* ------------------------------------------------------------------ */
+/*  Tests                                                             */
+/* ------------------------------------------------------------------ */
 describe('ChatPanel', () => {
-  let mockEditor: any;
-
-  beforeAll(() => {
-    // JSDOM doesn't implement scrollTo, so we need to mock it for the auto-scrolling effect.
-    window.HTMLElement.prototype.scrollTo = () => {};
-  });
-
   beforeEach(() => {
-    vi.resetModules();
-    vi.useFakeTimers();
-    vi.clearAllMocks();
-    mockEditor = {
-      batch: (cb: () => void) => cb(),
-      createShapes: vi.fn(),
-      groupShapes: vi.fn(),
-      getShape: vi.fn(),
-      select: vi.fn(),
-      getViewportPageBounds: vi.fn().mockReturnValue({ center: { x: 500, y: 500 } }),
-    };
-    mockUseEditor.mockReturnValue(mockEditor);
-    // Correctly mock the return value of the useSlidesStore hook
-    (useSlidesStore as unknown as Mock).mockReturnValue({ currentSlideId: 'slide-1' });
-  });
+    /* reset real Zustand store */
+    useSlidesStore.setState(initialSlidesState, true)
+    vi.clearAllMocks()
 
-  afterEach(async () => {
-    cleanup();
-    vi.restoreAllMocks();
-    await vi.runAllTimersAsync();
-  });
+    /* jsdom doesn't implement scrollTo — stub once */
+    Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+      configurable: true,
+      value: () => {},
+    })
+  })
 
-  test('renders correctly and displays placeholder', () => {
-    renderWithMockContext({}, mockEditor);
-    expect(screen.getByTestId('chat-panel')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Ask Slide-AI…')).toBeInTheDocument();
-  });
+  afterEach(() => cleanup())
 
-  test('displays messages from the conversation context', () => {
-    const messages: ConversationMessage[] = [
-      { role: 'user', content: 'Hello there', timestamp: new Date() },
-      { role: 'assistant', content: 'General Kenobi!', timestamp: new Date() },
-    ];
-    const getMessagesForSlide = vi.fn().mockReturnValue(messages);
-    renderWithMockContext({ getMessagesForSlide }, mockEditor);
-    expect(screen.getByText('Hello there')).toBeInTheDocument();
-    expect(screen.getByText('General Kenobi!')).toBeInTheDocument();
-  });
+  it('renders panel & placeholder', () => {
+    renderWithProviders()
+    expect(screen.getByTestId('chat-panel')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Ask Slide-AI…')).toBeInTheDocument()
+  })
 
-  test('calls submitUserMessage on send', async () => {
-    const submitUserMessage = vi.fn().mockResolvedValue(null);
-    const setDialogInput = vi.fn();
-    renderWithMockContext(
-      { submitUserMessage, setDialogInput, dialogInput: 'Create a diagram' },
-      mockEditor,
-    );
+  it('displays existing messages', () => {
+    renderWithProviders()
+    expect(screen.getByText('Hello there.')).toBeInTheDocument()
+    expect(screen.getByText('General Kenobi!')).toBeInTheDocument()
+  })
 
-    const sendButton = screen.getByTestId('send-button');
-    await userEvent.click(sendButton);
+  it('submits and clears input on send', async () => {
+    const submitUserMessage = vi.fn().mockResolvedValue(null)
+    const setDialogInput = vi.fn()
 
-    // The await on userEvent.click should be sufficient for the async handler to complete.
-    expect(submitUserMessage).toHaveBeenCalledWith({ currentSlideId: 'slide-1' }, 'Create a diagram');
-    expect(setDialogInput).toHaveBeenCalledWith('');
-  });
+    renderWithProviders({
+      submitUserMessage,
+      setDialogInput,
+      dialogInput: 'Create a diagram',
+    })
 
-  test('handles AI action to add a shape', async () => {
-    const sketchSpy = vi.spyOn(tldrawHelpers, 'createSketchShape');
-    const action: AiAction = {
+    await userEvent.click(screen.getByTestId('send-button'))
+
+    expect(submitUserMessage).toHaveBeenCalledWith(
+      { currentSlideId: 'slide-1' },
+      'Create a diagram',
+    )
+    expect(setDialogInput).toHaveBeenCalledWith('')
+  })
+
+  it('executes AI actions returned by the service', async () => {
+    const aiAction = {
       action: 'addShape',
       shape: 'diamond',
       label: 'Decision',
-    };
-    const submitUserMessage = vi.fn().mockResolvedValue(action);
-    renderWithMockContext(
-      { submitUserMessage, dialogInput: 'add a diamond' },
-      mockEditor,
-    );
+    } as const
 
-    await userEvent.click(screen.getByTestId('send-button'));
+    const submitUserMessage = vi.fn().mockResolvedValue(aiAction)
 
-    // The await on userEvent.click should be sufficient for the async handler to complete.
-    expect(sketchSpy).toHaveBeenCalledWith(mockEditor, 'diamond', { label: 'Decision' });
-  });
+    renderWithProviders({
+      submitUserMessage,
+      dialogInput: 'add a diamond',
+    })
 
-  test('displays loading indicator when localIsLoading is true', () => {
-    renderWithMockContext({ localIsLoading: true }, mockEditor);
-    expect(screen.getByTestId('loading-indicator')).toBeInTheDocument();
-  });
+    await userEvent.click(screen.getByTestId('send-button'))
 
-  test('displays error message when localError is present', () => {
-    renderWithMockContext({ localError: 'An AI error occurred' }, mockEditor);
-    expect(screen.getByText('An AI error occurred')).toBeInTheDocument();
-  });
-});
+    await waitFor(() => {
+      expect(sketchSpy).toHaveBeenCalledWith(
+        mockEditor,
+        'diamond',
+        { label: 'Decision' },
+      )
+    })
+  })
+
+  it('shows a loading spinner while awaiting AI', () => {
+    renderWithProviders({ localIsLoading: true })
+    expect(screen.getByTestId('loading-indicator')).toBeInTheDocument()
+  })
+
+  it('shows an error banner when the last request failed', () => {
+    renderWithProviders({ localError: 'An AI error occurred' })
+    expect(screen.getByText('An AI error occurred')).toBeInTheDocument()
+  })
+})

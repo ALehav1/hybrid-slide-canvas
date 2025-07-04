@@ -28,6 +28,7 @@
     "immer": "^10.1.1",
     "jspdf": "^3.0.1",
     "lodash.throttle": "^4.1.1",
+    "lucide-react": "^0.525.0",
     "nanoid": "^5.0.0",
     "openai": "^4.2.0",
     "perfect-freehand": "^1.2.2",
@@ -37,6 +38,7 @@
     "roughjs": "^4.6.6",
     "simplify-js": "^1.2.4",
     "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.6",
     "zustand": "^4.5.2"
   },
   "devDependencies": {
@@ -44,6 +46,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/lodash.throttle": "^4.1.9",
+    "@types/node": "^24.0.10",
     "@types/react": "^19.0.9",
     "@types/react-dom": "^19.0.4",
     "@typescript-eslint/eslint-plugin": "^8.35.1",

@@ -17,7 +17,7 @@ const DB_VERSION = 1;
 /**
  * Database schema definition
  */
-interface HybridCanvasDB extends DBSchema {
+export interface HybridCanvasDB extends DBSchema {
   // Slides store - contains slide metadata (not the full content)
   slides: {
     key: string;
@@ -62,6 +62,9 @@ interface HybridCanvasDB extends DBSchema {
     value: any;
   };
 }
+
+// Type for store names - fixes IndexedDB generics
+export type StoreName = keyof HybridCanvasDB;
 
 // Database instance reference
 let dbInstance: IDBPDatabase<HybridCanvasDB> | null = null;
@@ -153,7 +156,7 @@ export function closeDatabase(): void {
  * @param data The data to store
  * @returns The key of the stored object
  */
-export async function storeData<T extends keyof HybridCanvasDB>(
+export async function storeData<T extends StoreName>(
   storeName: T,
   data: HybridCanvasDB[T]['value']
 ): Promise<IDBValidKey> {
@@ -174,7 +177,7 @@ export async function storeData<T extends keyof HybridCanvasDB>(
  * @param key The key to retrieve
  * @returns The retrieved data or undefined if not found
  */
-export async function getData<T extends keyof HybridCanvasDB>(
+export async function getData<T extends StoreName>(
   storeName: T,
   key: IDBValidKey
 ): Promise<HybridCanvasDB[T]['value'] | undefined> {
@@ -196,7 +199,7 @@ export async function getData<T extends keyof HybridCanvasDB>(
  * @param storeName The name of the object store
  * @param key The key to delete
  */
-export async function deleteData<T extends keyof HybridCanvasDB>(
+export async function deleteData<T extends StoreName>(
   storeName: T,
   key: IDBValidKey
 ): Promise<void> {
@@ -215,7 +218,7 @@ export async function deleteData<T extends keyof HybridCanvasDB>(
  * @param storeName The name of the object store
  * @returns Array of all data in the store
  */
-export async function getAllData<T extends keyof HybridCanvasDB>(
+export async function getAllData<T extends StoreName>(
   storeName: T
 ): Promise<HybridCanvasDB[T]['value'][]> {
   const db = await getDatabase();
@@ -251,7 +254,7 @@ export async function clearStore<T extends keyof HybridCanvasDB>(
  * @param indexName The name of the index
  * @param key The key to search for
  */
-export async function getByIndex<T extends keyof HybridCanvasDB>(
+export async function getDataByIndex<T extends StoreName>(
   storeName: T,
   indexName: string,
   key: IDBValidKey

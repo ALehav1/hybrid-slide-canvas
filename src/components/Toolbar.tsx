@@ -1,7 +1,8 @@
 import React from 'react'
-import { useEditor } from 'tldraw'
+import { useEditor } from '@tldraw/tldraw'
 import { useHistoryManager } from '@/lib/history/useHistoryManager'
 import { useHistoryStore } from '@/lib/history/useHistoryStore'
+import { ExportMenu } from './ExportMenu'
 
 export const Toolbar: React.FC = () => {
 	const editor = useEditor()
@@ -64,7 +65,8 @@ export const Toolbar: React.FC = () => {
 			>
 				Pen
 			</button>
+			<div className="w-px h-6 bg-gray-200" />
+			<ExportMenu editor={editor as any} />
 		</div>
 	)
 }
-

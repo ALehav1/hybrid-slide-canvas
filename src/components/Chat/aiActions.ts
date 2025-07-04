@@ -48,6 +48,13 @@ export const AiActionSchema = z.discriminatedUnion("action", [
       selector: z.string().optional(),
     })
     .strict(),
+
+  z
+    .object({
+      action: z.literal('createDiagram'),
+      prompt: z.string().min(5),
+    })
+    .strict(),
 ]);
 
 export type AiAction = z.infer<typeof AiActionSchema>;

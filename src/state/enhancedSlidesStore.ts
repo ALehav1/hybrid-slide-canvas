@@ -53,7 +53,7 @@ export interface SlidesState {
 // Create initial message for first slide
 const initialMessage: ConversationMessage = {
   role: 'assistant',
-  content: 'Welcome to your first slide! Ask me to create content for your presentation.',
+  content: `Welcome! You can ask me to:\n• "Add a blue square"\n• "Create a flowchart of a login process"`,
   timestamp: new Date(),
   id: nanoid()
 };

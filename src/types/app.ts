@@ -58,6 +58,10 @@ export interface SlideData<M extends Record<string, unknown> = Record<string, un
   title: string
   /** The key we look up in the `snapshots` dictionary in the store. */
   snapshotId: string
+  /** The ID of the tldraw frame shape corresponding to this slide. */
+  frameId: string
+  /** The conversation history associated with the slide. */
+  conversation: ConversationMessage[]
   createdAt: Date
   updatedAt: Date
   thumbnailUrl?: string

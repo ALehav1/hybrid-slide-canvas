@@ -1,9 +1,8 @@
-import React, { useTransition } from 'react';
-import { type Editor } from '@tldraw/tldraw';
+import React, { useTransition, useContext } from 'react';
+import { EditorContext } from '@/context/EditorContext';
 import { useEnhancedSlidesStore } from '../state/enhancedSlidesStore';
 
 interface SlideRailProps {
-  editor: Editor | null;
   className?: string;
 }
 
@@ -11,7 +10,8 @@ interface SlideRailProps {
  * SlideRail - Thumbnail navigation for slides
  * Extracted from App.tsx nav section for proper component isolation
  */
-export function SlideRail({ editor, className = '' }: SlideRailProps) {
+export function SlideRail({ className = '' }: SlideRailProps) {
+  const editor = useContext(EditorContext);
   const [isPending, startTransition] = useTransition();
   const slides = useEnhancedSlidesStore(state => state.slides);
   const currentSlideId = useEnhancedSlidesStore(state => state.currentSlideId);

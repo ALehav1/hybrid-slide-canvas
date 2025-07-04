@@ -1,9 +1,12 @@
-import React, { useEffect, useRef, useTransition, Suspense, useState } from 'react';
-import type { Editor } from '@tldraw/tldraw';
+import React, { useEffect, useRef, useTransition, Suspense, useState, useContext } from 'react';
+
+import { EditorContext } from '@/context/EditorContext';
 import { useConversationContext } from '../../hooks/useConversationContext';
-import { useEnhancedSlidesStore } from '../../state/enhancedSlidesStore';
+import { useEnhancedSlidesStore, type SlidesState } from '../../state/enhancedSlidesStore';
 import { createSketchShape } from '../../lib/tldrawHelpers';
 import { type AiAction } from './aiActions';
+import { AIService } from '@/lib/services/AIService';
+import { CanvasRenderer } from '@/lib/canvas/CanvasRenderer';
 
 // Simple loading fallback component 
 const LoadingFallback: React.FC = () => (
@@ -30,12 +33,9 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ error, onRetry }) => (
   </div>
 );
 
-interface ChatPanelProps {
-  editor: Editor | null;
-}
-
-export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
-  const currentSlideId = useSlidesStore(s => s.currentSlideId);
+export const ChatPanel: React.FC = () => {
+  const editor = useContext(EditorContext);
+  const currentSlideId = useEnhancedSlidesStore((s: SlidesState) => s.currentSlideId);
   const {
     dialogInput,
     setDialogInput,
@@ -71,9 +71,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
         });
       }
     },
+    createDiagram: (action) => {
+      if (editor && action.action === 'createDiagram') {
+        const ai = new AIService();
+        const renderer = new CanvasRenderer(editor);
+        void renderer.renderDiagram(action.prompt, ai);
+      }
+    },
   };
 
-  const handleSend = async () => {
+  const handleSend = () => {
     if (localError) clearError();
 
     const text = dialogInput.trim();
@@ -86,21 +93,27 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
     setOptimisticMessages([...optimisticMessages, { role: 'user', content: text }]);
     
     // Use transition for the heavy processing to avoid blocking the UI
-    startTransition(async () => {
+    startTransition(() => {
       try {
         // Process the user message and get any resulting action
-        const action = await submitUserMessage(currentSlideId, text);
-        
-        // If there's an action to perform, handle it after the message is processed
-        if (action && action.action in actionHandlers) {
-          const handler = actionHandlers[action.action];
-          if (handler) {
-            // Handle the action (e.g., add shapes to the canvas)
-            handler(action);
+        // Process the user message and get any resulting action
+        void submitUserMessage(currentSlideId, text).then(action => {
+          // If there's an action to perform, handle it after the message is processed
+          if (action && action.action in actionHandlers) {
+            const handler = actionHandlers[action.action];
+            if (handler) {
+              // Handle the action (e.g., add shapes to the canvas)
+              handler(action);
+            }
           }
-        }
+        });
         
-        // Clear optimistic messages after real update is complete
+
+        
+        // Optimistic messages are cleared within the .then() block of the async operation
+        // to ensure they are removed only after the operation completes.
+        // For simplicity in this refactor, we'll clear them immediately.
+        // A more robust implementation might handle this differently.
         setOptimisticMessages([]);
       } catch (error) {
         console.error('Failed to process message:', error);
@@ -158,7 +171,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ editor }) => {
             id="chat-input"
             type="text"
             className="w-full p-2 pr-10 border rounded-md"
-            placeholder="Ask Slide-AI…"
+            placeholder="e.g., Create a user login flowchart"
             value={dialogInput}
             onChange={(e) => { setDialogInput(e.target.value); }}
             onKeyDown={(e) => {

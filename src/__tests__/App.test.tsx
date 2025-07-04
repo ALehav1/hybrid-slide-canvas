@@ -6,29 +6,9 @@ import App from '../App';
 // Mock the OpenAI client to prevent API calls and import.meta errors
 vi.mock('../lib/openaiClient');
 
-// Mock the enhanced slides store to provide a stable state for the App component
-vi.mock('../state/enhancedSlidesStore', () => ({
-  useEnhancedSlidesStore: vi.fn(() => ({
-    slides: [
-      { id: '1', number: 1, frameId: 'frame1', conversation: [], createdAt: new Date().toISOString(), title: 'Slide 1' },
-      { id: '2', number: 2, frameId: 'frame2', conversation: [], createdAt: new Date().toISOString(), title: 'Slide 2' },
-    ],
-    currentSlide: 1,
-    totalSlides: 2,
-    addNewSlide: vi.fn(),
-    deleteSlide: vi.fn(),
-    jumpToSlide: vi.fn(),
-    navigateSlide: vi.fn(),
-    reorderSlides: vi.fn(),
-    getCurrentSlide: vi.fn(() => ({ id: '1', number: 1, frameId: 'frame1', conversation: [], createdAt: new Date().toISOString(), title: 'Slide 1' })),
-    setShowSlideNavigator: vi.fn(),
-    setDraggedSlide: vi.fn(),
-    setDragOverSlide: vi.fn(),
-    showSlideNavigator: true,
-    draggedSlide: null,
-    dragOverSlide: null,
-  })),
-}));
+// Import real store for testing
+import { useEnhancedSlidesStore } from '../state/enhancedSlidesStore';
+const initialEnhancedState = useEnhancedSlidesStore.getState();
 
 // Mock child components that have complex dependencies like `useEditor`
 vi.mock('../components/LibraryPanel', () => ({

@@ -1,9 +1,9 @@
 // __tests__/FreeDrawIntegration.test.ts
 // __tests__/FreeDrawIntegration.test.ts
 import { describe, it, expect, beforeEach } from 'vitest'
-import { FreeDrawShapeUtil, getSvgPath } from '../lib/shapes/FreeDrawShapeUtil.tsx'
-import type { IFreeDrawShape } from '../lib/shapes/FreeDrawShapeUtil.tsx'
-import { DefaultColorStyle, DefaultSizeStyle, Polygon2d, Vec, type Editor } from 'tldraw'
+import { FreeDrawShapeUtil, getSvgPath } from '../lib/shapes/FreeDrawShapeUtil'
+import type { IFreeDrawShape } from '../lib/shapes/FreeDrawShapeUtil'
+import { DefaultColorStyle, DefaultSizeStyle, Polygon2d, Vec, type Editor } from '@tldraw/tldraw'
 
 describe('FreeDrawShapeUtil - Final Integration', () => {
   let util: FreeDrawShapeUtil

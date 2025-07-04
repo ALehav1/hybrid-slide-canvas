@@ -1,6 +1,6 @@
-import { Suspense } from 'react';
-import { Tldraw, type Editor, type TLComponents, type TLStore } from '@tldraw/tldraw';
-import { FreeDrawShapeUtil } from '../lib/shapes/FreeDrawShapeUtil.tsx';
+import React, { Suspense } from 'react';
+import { Tldraw, type Editor, type TLComponents, type TLStore, createTLStore, defaultShapeUtils } from '@tldraw/tldraw';
+import { FreeDrawShapeUtil } from '../lib/shapes/FreeDrawShapeUtil';
 import { FreeDrawTool } from '@/lib/tools/FreeDrawTool';
 import { applyTheme } from '../lib/theme';
 
@@ -16,8 +16,10 @@ const CanvasLoadingFallback = () => (
 
 interface Props {
   slideId: string;
-  store: TLStore;
-  onMount: (editor: Editor) => void;
+  store?: TLStore;
+  onMount?: (editor: Editor) => void;
+  /** @deprecated Use onMount instead */
+  onEditorMount?: (editor: Editor) => void;
   className?: string;
 }
 
@@ -35,16 +37,20 @@ const customComponents: Partial<TLComponents> = {
  * Canvas slide component that renders a TLDraw canvas with proper error handling and lazy loading
  * Uses TLDraw's official components API instead of children for UI customization
  */
-export const CanvasSlide: React.FC<Props> = ({ slideId: _slideId, store, onMount, className = '' }) => {
+export const CanvasSlide: React.FC<Props> = ({ slideId: _slideId, store, onMount, onEditorMount, className = '' }) => {
+  // Create a local store if none provided
+  const tlStore = store || createTLStore({ shapeUtils: [...defaultShapeUtils, FreeDrawShapeUtil] });
   // Use React 19's Suspense for async loading of the canvas
   return (
     <Suspense fallback={<CanvasLoadingFallback />}>
       <Tldraw
-        store={store}
+        store={tlStore}
         onMount={(editor) => {
           // Enhance with error handling
           try {
-            onMount(editor); // Pass the editor instance up to the parent
+            // Call both callbacks for backward compatibility
+            onMount?.(editor);
+            onEditorMount?.(editor); // deprecated but still supported
             applyTheme(editor);
           } catch (error) {
             console.error('Error mounting TLDraw editor:', error);

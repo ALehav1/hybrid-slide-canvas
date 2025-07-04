@@ -10,13 +10,13 @@ import {
 	T,
 	Vec,
 	getDefaultColorTheme,
-} from 'tldraw'
+} from '@tldraw/tldraw'
 import type {
 	SvgExportContext,
 	TLBaseShape,
 	TLDefaultColorStyle,
 	TLDefaultSizeStyle,
-} from 'tldraw'
+} from '@tldraw/tldraw'
 
 /* ---------- Types --------------------------------------------------------- */
 export type IFreeDrawShape = TLBaseShape<

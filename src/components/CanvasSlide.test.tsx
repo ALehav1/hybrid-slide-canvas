@@ -1,5 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CanvasSlide } from './CanvasSlide';
+import React from 'react';
 import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { Editor } from '@tldraw/tldraw';
 
@@ -61,7 +62,7 @@ describe('CanvasSlide', () => {
     render(
       <CanvasSlide 
         slideId="test-slide-1" 
-        onEditorMount={mockOnEditorMount}
+        onMount={mockOnEditorMount}
       />
     );
 
@@ -73,11 +74,11 @@ describe('CanvasSlide', () => {
   // Removed test for rendering children inside TLDraw, as TLDraw does not support this pattern.
   // Custom UI elements should be passed via the `components` prop to Tldraw.
 
-  test('calls onEditorMount with editor instance when mounted', () => {
+  test('calls onMount with editor instance when mounted', () => {
     render(
       <CanvasSlide 
         slideId="test-slide-1" 
-        onEditorMount={mockOnEditorMount}
+        onMount={mockOnEditorMount}
       />
     );
 
@@ -86,7 +87,7 @@ describe('CanvasSlide', () => {
     const mountTrigger = screen.getByTestId('mock-mount-trigger');
     fireEvent.click(mountTrigger);
 
-    // Check if the onEditorMount callback was called
+    // Check if the onMount callback was called
     expect(mockOnEditorMount).toHaveBeenCalledWith(expect.any(Object));
   });
 
@@ -94,7 +95,7 @@ describe('CanvasSlide', () => {
     render(
       <CanvasSlide 
         slideId="test-slide-1" 
-        onEditorMount={mockOnEditorMount}
+        onMount={mockOnEditorMount}
       />
     );
 
