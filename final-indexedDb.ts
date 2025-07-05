@@ -26,12 +26,6 @@ export interface HybridCanvasDB extends DBSchema {
       title: string;
       updatedAt: number;
       thumbnailUrl?: string;
-        /**
-         * Optional field used by persistence middleware to store
-         * serialized Zustand state blobs. Kept optional so legacy data
-         * (which never had this property) stays type-compatible.
-         */
-        value?: unknown;
     };
     indexes: {
       'by-updated': number;
@@ -56,12 +50,6 @@ export interface HybridCanvasDB extends DBSchema {
         timestamp: Date;
       }[];
       lastModified: number;
-        /**
-         * Optional serialized blob written by the persistence middleware.
-         * Existing conversation records will not include it, so it must be
-         * optional.
-         */
-        value?: unknown;
     };
     indexes: {
       'by-modified': number;
@@ -272,7 +260,7 @@ export async function getAllData<T extends StoreName>(
 
 /**
  * Clear all data from the specified object store
- *
+ * 
  * @param storeName The name of the object store
  */
 export async function clearStore<T extends StoreName>(
@@ -284,15 +272,45 @@ export async function clearStore<T extends StoreName>(
     const store = tx.objectStore(storeName);
     await store.clear();
     await tx.done;
-
+    
     logger.debug(`Cleared all data from ${storeName}`);
   } catch (error) {
     logger.error(`Error clearing store ${storeName}:`, error);
-    throw new Error(
-      `Failed to clear store ${storeName}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
+    throw new Error(`Failed to clear store ${storeName}: ${(error instanceof Error ? error.message : String(error))}`);
+  }
+}
+
+/**
+ * Get data by index
+ * 
+ * @param storeName The name of the object store
+ * @param indexName The name of the index
+ * @param key The key to search for
+ */
+export async function getDataByIndex<T extends StoreName>(
+  storeName: T,
+  indexName: string,
+  key: IDBValidKey
+): Promise<StoreValue<T> | undefined> {
+  try {
+    const db = await getDatabase();
+    const tx = db.transaction(storeName, 'readonly');
+    const objectStore = tx.objectStore(storeName);
+    
+    // Check if the index exists before trying to access it
+    if (!objectStore.indexNames.contains(indexName)) {
+      throw new Error(`Index '${indexName}' does not exist in store '${storeName}'`);
+    }
+    
+    // Use type assertion to overcome the complex type constraint
+    // This is safe because we've checked that the index exists
+    const index = objectStore.index(indexName as any);
+    const data = await index.get(key);
+    
+    return data;
+  } catch (error) {
+    logger.error(`Error getting data by index from ${storeName}:`, error);
+    throw new Error(`Failed to get data by index from ${storeName}: ${(error instanceof Error ? error.message : String(error))}`);
   }
 }
 
@@ -345,6 +363,7 @@ export const indexedDB = {
   store: storeData,
   delete: deleteData,
   clear: clearStore,
+  getByIndex: getDataByIndex,
   withTransaction,
   close: closeDatabase,
   isSupported: isIndexedDBSupported,

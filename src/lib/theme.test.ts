@@ -34,7 +34,7 @@ describe('theme', () => {
   describe('applyTheme', () => {
     test('applies correct styles to editor', () => {
       // Call the function with mock editor
-      applyTheme(mockEditor);
+      applyTheme();
       
       // Check that it sets the correct styles (anchored by arguments not call index)
       expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledTimes(4);
@@ -48,7 +48,7 @@ describe('theme', () => {
   describe('resetTheme', () => {
     test('resets styles to default values', () => {
       // Call the function with mock editor
-      resetTheme(mockEditor);
+      resetTheme();
       
       // Check that it sets the correct default styles (anchored by arguments not call index)
       expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledTimes(4);

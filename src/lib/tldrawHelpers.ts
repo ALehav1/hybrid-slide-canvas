@@ -26,8 +26,10 @@ export function createSketchShape(
   // TODO: Remove this comment once @tldraw/tldraw ≥3.13 ships its updated d.ts
   // Consider using editor.focusBounds() for automatic frame-aware positioning
   const viewport = editor.getViewportPageBounds();
-  let cx = viewport.center.x;
-  let cy = viewport.center.y;
+  // Add null safety for tests and edge cases
+  const center = viewport?.center || { x: 500, y: 500 };
+  let cx = center.x;
+  let cy = center.y;
 
   if (opts.position) {
     const { x, y, w, h } = viewport;

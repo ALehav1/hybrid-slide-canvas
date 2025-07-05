@@ -8,15 +8,14 @@
  * - Automatic change detection from TLDraw editor
  * - Origin tagging for user vs AI vs template actions
  * - Keyboard shortcut integration (Ctrl+Z, Ctrl+Y, etc.)
- * - Batched operations support
- * - Performance optimization with debouncing
+ * - Performance optimization
  */
 
-import { useEffect, useCallback, useRef } from 'react';
-import { useEditor, type Editor, type TLRecord } from '@tldraw/tldraw';
-import { useHistoryStore } from './HistoryManager';
+import { useCallback } from 'react';
+import { useEditor } from '@tldraw/tldraw';
+import { useHistoryManager } from './useHistoryManager';
+import { type OriginType } from './HistoryManager';
 import { logger } from '../utils/logging';
-import type { HistoryOrigin } from './types';
 
 /**
  * Configuration for the editor history integration
@@ -25,24 +24,11 @@ export interface EditorHistoryConfig {
   /** Whether to enable keyboard shortcuts (default: true) */
   enableKeyboardShortcuts?: boolean;
   
-  /** Debounce delay for batching rapid changes (default: 100ms) */
-  debounceMs?: number;
-  
   /** Default origin for user actions (default: 'user') */
-  defaultOrigin?: HistoryOrigin;
+  defaultOrigin?: OriginType;
   
   /** Whether to track all editor changes (default: true) */
   trackAllChanges?: boolean;
-}
-
-/**
- * Context for tracking the current operation origin
- * Used to tag changes with their source (user, AI, template)
- */
-interface OperationContext {
-  origin: HistoryOrigin;
-  description: string;
-  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -51,214 +37,94 @@ interface OperationContext {
  */
 export function useEditorHistory(config: EditorHistoryConfig = {}) {
   const editor = useEditor();
-  const historyStore = useHistoryStore();
+  const historyManager = useHistoryManager();
   
   // Configuration with defaults
   const {
     enableKeyboardShortcuts = true,
-    debounceMs = 100,
     defaultOrigin = 'user',
     trackAllChanges = true,
   } = config;
   
-  // Track current operation context
-  const operationContext = useRef<OperationContext | null>(null);
-  
-  // Track the previous state for comparison
-  const previousState = useRef<TLRecord[]>([]);
-  
-  // Debounce timer for batching rapid changes
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-  
-  /**
-   * Set the origin for the next operation
-   * This should be called before making changes that should be attributed to a specific origin
-   */
-  const setOperationOrigin = useCallback((origin: HistoryOrigin, description: string, metadata?: Record<string, unknown>) => {
-    operationContext.current = { origin, description, metadata };
-    logger.debug(`Set operation origin: ${origin} - ${description}`);
-  }, []);
-  
-  /**
-   * Clear the operation context
-   */
-  const clearOperationContext = useCallback(() => {
-    operationContext.current = null;
-  }, []);
-  
   /**
    * Execute a function with a specific origin context
-   * Automatically sets and clears the operation context
    */
-  const executeWithOrigin = useCallback((origin: HistoryOrigin, description: string, operation: () => void, metadata?: Record<string, unknown>) => {
-    setOperationOrigin(origin, description, metadata);
-    try {
-      operation();
-    } finally {
-      clearOperationContext();
-    }
-  }, [setOperationOrigin, clearOperationContext]);
+  const withOrigin = useCallback(
+    (origin: OriginType, fn: () => void) => {
+      if (!editor || !historyManager) return;
+      historyManager.withOrigin(origin, fn);
+    },
+    [editor, historyManager]
+  );
   
   /**
-   * Create a history entry for the current editor state change
+   * Execute a function without recording history
    */
-  const createHistoryEntry = useCallback((description: string, origin: HistoryOrigin, beforeState: TLRecord[], afterState: TLRecord[]) => {
-    // Create undo/redo functions that restore/apply the state
-    const undo = () => {
-      if (editor) {
-        editor.history.ignore(() => {
-          // Restore the previous state
-          editor.store.clear();
-          editor.store.put(beforeState);
-        });
-      }
-    };
-    
-    const redo = () => {
-      if (editor) {
-        editor.history.ignore(() => {
-          // Apply the after state
-          editor.store.clear();
-          editor.store.put(afterState);
-        });
-      }
-    };
-    
-    // Add to history manager
-    historyStore.addEntry({
-      origin,
-      description,
-      undo,
-      redo,
-      metadata: {
-        beforeRecordCount: beforeState.length,
-        afterRecordCount: afterState.length,
-        editorId: editor?.instanceId,
-      },
-    });
-  }, [editor, historyStore]);
-  
-  /**
-   * Handle editor changes with debouncing
-   */
-  const handleEditorChange = useCallback(() => {
-    if (!editor || !trackAllChanges) return;
-    
-    // Clear existing debounce timer
-    if (debounceTimer.current) {
-      clearTimeout(debounceTimer.current);
-    }
-    
-    // Set new debounce timer
-    debounceTimer.current = setTimeout(() => {
-      const currentState = editor.store.allRecords();
-      const context = operationContext.current;
-      
-      // Only create history entry if there are actual changes
-      if (JSON.stringify(currentState) !== JSON.stringify(previousState.current)) {
-        const origin = context?.origin || defaultOrigin;
-        const description = context?.description || 'Editor change';
-        
-        createHistoryEntry(description, origin, previousState.current, currentState);
-        
-        // Update previous state
-        previousState.current = [...currentState];
-      }
-      
-      // Clear context after use
-      clearOperationContext();
-    }, debounceMs);
-  }, [editor, trackAllChanges, debounceMs, defaultOrigin, createHistoryEntry, clearOperationContext]);
-  
-  /**
-   * Handle keyboard shortcuts for undo/redo
-   */
-  const handleKeyboardShortcuts = useCallback((event: KeyboardEvent) => {
-    if (!enableKeyboardShortcuts) return;
-    
-    const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-    
-    if (isCtrlOrCmd && event.key === 'z' && !event.shiftKey) {
-      // Ctrl+Z: Undo
-      event.preventDefault();
-      const success = historyStore.undo();
-      if (success) {
-        logger.debug('Keyboard shortcut: Undo');
-      }
-    } else if (isCtrlOrCmd && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
-      // Ctrl+Y or Ctrl+Shift+Z: Redo
-      event.preventDefault();
-      const success = historyStore.redo();
-      if (success) {
-        logger.debug('Keyboard shortcut: Redo');
-      }
-    }
-  }, [enableKeyboardShortcuts, historyStore]);
+  const withoutHistory = useCallback(<T,>(fn: () => T): T => {
+    if (!editor || !historyManager) return fn();
+    return historyManager.ignore(fn);
+  }, [editor, historyManager]);
   
   /**
    * Undo with optional origin filtering
    */
-  const undo = useCallback((origin?: HistoryOrigin) => {
-    const success = historyStore.undo(origin);
-    if (success) {
-      logger.debug(`Undo${origin ? ` (${origin})` : ''} executed`);
-    }
-    return success;
-  }, [historyStore]);
+  const undo = useCallback((origin?: OriginType) => {
+    if (!editor) return false;
+    
+    if (!historyManager) return false;
+    historyManager.undo(origin);
+    logger.debug(`Undo${origin ? ` (${origin})` : ''} executed`);
+    return true;
+  }, [editor, historyManager]);
   
   /**
    * Redo with optional origin filtering
    */
-  const redo = useCallback((origin?: HistoryOrigin) => {
-    const success = historyStore.redo(origin);
-    if (success) {
-      logger.debug(`Redo${origin ? ` (${origin})` : ''} executed`);
-    }
-    return success;
-  }, [historyStore]);
+  const redo = useCallback((origin?: OriginType) => {
+    if (!editor) return false;
+    
+    if (!historyManager) return false;
+    historyManager.redo(origin);
+    logger.debug(`Redo${origin ? ` (${origin})` : ''} executed`);
+    return true;
+  }, [editor, historyManager]);
   
   /**
    * Check if undo is available
    */
-  const canUndo = useCallback((origin?: HistoryOrigin) => {
-    return historyStore.canUndo(origin);
-  }, [historyStore]);
+  const canUndo = useCallback(
+    (origin?: OriginType) => historyManager?.canUndo(origin) ?? false,
+    [historyManager]
+  );
   
   /**
    * Check if redo is available
    */
-  const canRedo = useCallback((origin?: HistoryOrigin) => {
-    return historyStore.canRedo(origin);
-  }, [historyStore]);
+  const canRedo = useCallback(
+    (origin?: OriginType) => historyManager?.canRedo(origin) ?? false,
+    [historyManager]
+  );
   
-  // Set up editor change listener
-  useEffect(() => {
-    if (!editor) return;
-    
-    // Initialize previous state
-    previousState.current = editor.store.allRecords();
-    
-    // Listen for editor changes
-    const unsubscribe = editor.store.listen(handleEditorChange);
-    
-    return () => {
-      unsubscribe();
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-    };
-  }, [editor, handleEditorChange]);
+  /**
+   * Set the current origin for subsequent operations
+   */
+  const setOrigin = useCallback((origin: OriginType) => {
+    historyManager?.setOrigin(origin);
+  }, [historyManager]);
   
-  // Set up keyboard shortcuts
-  useEffect(() => {
-    if (!enableKeyboardShortcuts) return;
-    
-    document.addEventListener('keydown', handleKeyboardShortcuts);
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyboardShortcuts);
-    };
-  }, [enableKeyboardShortcuts, handleKeyboardShortcuts]);
+  /**
+   * Pause history recording
+   */
+  const pauseHistory = useCallback(() => {
+    historyManager?.pause();
+  }, [historyManager]);
+  
+  /**
+   * Resume history recording
+   */
+  const resumeHistory = useCallback(() => {
+    historyManager?.resume();
+  }, [historyManager]);
   
   // Return the history interface
   return {
@@ -269,19 +135,20 @@ export function useEditorHistory(config: EditorHistoryConfig = {}) {
     canRedo,
     
     // Origin management
-    setOperationOrigin,
-    clearOperationContext,
-    executeWithOrigin,
+    withOrigin,
+    withoutHistory,
+    setOrigin,
+    
+    // History recording control
+    pauseHistory,
+    resumeHistory,
     
     // History state
-    historyStore,
+    historyManager,
     
     // Utilities
-    clear: historyStore.clear,
-    clearByOrigin: historyStore.clearByOrigin,
-    setEnabled: historyStore.setEnabled,
-    getEntriesByOrigin: historyStore.getEntriesByOrigin,
-    getRecentEntries: historyStore.getRecentEntries,
+    clear: (origin?: OriginType) => historyManager?.clearByOrigin?.(origin ?? 'user'),
+    setEnabled: (enabled: boolean) => historyManager?.setEnabled(enabled),
   };
 }
 
@@ -290,23 +157,24 @@ export function useEditorHistory(config: EditorHistoryConfig = {}) {
  * Provides a convenient way to execute AI actions with proper origin tagging
  */
 export function useAIHistory() {
-  const editorHistory = useEditorHistory();
+  const { withOrigin, undo, canUndo, clear } = useEditorHistory();
   
-  const executeAIAction = useCallback((description: string, action: () => void, metadata?: Record<string, unknown>) => {
-    editorHistory.executeWithOrigin('ai', description, action, metadata);
-  }, [editorHistory]);
+  const executeAIAction = useCallback(
+    (action: () => void) => withOrigin('ai', action),
+    [withOrigin]
+  );
   
   const undoAIActions = useCallback(() => {
-    return editorHistory.undo('ai');
-  }, [editorHistory]);
+    return undo('ai');
+  }, [undo]);
   
   const canUndoAIActions = useCallback(() => {
-    return editorHistory.canUndo('ai');
-  }, [editorHistory]);
+    return canUndo('ai');
+  }, [canUndo]);
   
   const clearAIHistory = useCallback(() => {
-    editorHistory.clearByOrigin('ai');
-  }, [editorHistory]);
+    clear('ai');
+  }, [clear]);
   
   return {
     executeAIAction,
@@ -321,23 +189,24 @@ export function useAIHistory() {
  * Provides a convenient way to execute template actions with proper origin tagging
  */
 export function useTemplateHistory() {
-  const editorHistory = useEditorHistory();
+  const { withOrigin, undo, canUndo, clear } = useEditorHistory();
   
-  const executeTemplateAction = useCallback((description: string, action: () => void, metadata?: Record<string, unknown>) => {
-    editorHistory.executeWithOrigin('template', description, action, metadata);
-  }, [editorHistory]);
+  const executeTemplateAction = useCallback(
+    (action: () => void) => withOrigin('template', action),
+    [withOrigin]
+  );
   
   const undoTemplateActions = useCallback(() => {
-    return editorHistory.undo('template');
-  }, [editorHistory]);
+    return undo('template');
+  }, [undo]);
   
   const canUndoTemplateActions = useCallback(() => {
-    return editorHistory.canUndo('template');
-  }, [editorHistory]);
+    return canUndo('template');
+  }, [canUndo]);
   
   const clearTemplateHistory = useCallback(() => {
-    editorHistory.clearByOrigin('template');
-  }, [editorHistory]);
+    clear('template');
+  }, [clear]);
   
   return {
     executeTemplateAction,

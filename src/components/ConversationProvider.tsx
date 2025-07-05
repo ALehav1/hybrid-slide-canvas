@@ -78,7 +78,7 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
     const loadState = async () => {
       try {
         setStorageIsLoading(true);
-        const savedData = await conversationStore.getItem(CONVERSATION_STORE_KEY);
+        const savedData = await conversationStore?.getItem(CONVERSATION_STORE_KEY);
         if (savedData && isMounted) {
           const { conversations, isChatExpanded: savedIsExpanded } = savedData.state;
           if (conversations) {
@@ -249,7 +249,7 @@ Based on the user request above, generate the corresponding JSON object.`;
 
           if (parsedAction.success) {
             const assistantResponse = `Action: \`\`\`json\n${JSON.stringify(parsedAction.data, null, 2)}\n\`\`\``;
-            startTransition(() => addMessage(slideId, 'assistant', assistantResponse));
+            startTransition(() => { addMessage(slideId, 'assistant', assistantResponse); });
             return parsedAction.data;
           } else {
             logger.error('AI action validation failed', parsedAction.error.flatten());

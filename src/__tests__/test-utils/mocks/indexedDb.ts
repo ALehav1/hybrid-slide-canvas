@@ -40,7 +40,6 @@ export const getData = vi.fn().mockImplementation(async () => Promise.resolve({}
 export const deleteData = vi.fn().mockImplementation(async () => Promise.resolve());
 export const getAllData = vi.fn().mockImplementation(async () => Promise.resolve([]));
 export const clearStore = vi.fn().mockImplementation(async () => Promise.resolve());
-export const getByIndex = vi.fn().mockImplementation(async () => Promise.resolve({}));
 export const isIndexedDBSupported = vi.fn().mockReturnValue(true);
 
 // Add logger mock
@@ -82,7 +81,6 @@ interface MockExports {
   deleteData: ReturnType<typeof vi.fn>;
   getAllData: ReturnType<typeof vi.fn>;
   clearStore: ReturnType<typeof vi.fn>;
-  getByIndex: ReturnType<typeof vi.fn>;
   isIndexedDBSupported: ReturnType<typeof vi.fn>;
   logger: { error: ReturnType<typeof vi.fn>, warn: ReturnType<typeof vi.fn>, info: ReturnType<typeof vi.fn>, debug: ReturnType<typeof vi.fn> };
   resetMocks: () => void;
@@ -100,7 +98,6 @@ const mockExports: MockExports = {
   deleteData,
   getAllData,
   clearStore,
-  getByIndex,
   isIndexedDBSupported,
   logger,
   resetMocks,

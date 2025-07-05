@@ -171,7 +171,9 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
         }
 
         logger.info('Deleting slide', { slideId });
-        editor.deleteShapes([slideToDelete.frameId]);
+        if (slideToDelete.frameId) {
+          editor.deleteShapes([slideToDelete.frameId as any]);
+        }
 
         set((state) => {
           const slides = state.slides.filter((s) => s.id !== slideId);
@@ -208,11 +210,13 @@ export const useEnhancedSlidesStore = create<SlidesState>()(
         set({ currentSlideId: id });
 
         // Zoom to the frame associated with the slide
-        const shape = editor.getShape(targetSlide.frameId);
-        if (shape) {
-          const bounds = editor.getShapePageBounds(shape);
-          if (bounds) {
-            editor.zoomToBounds(bounds, { animation: { duration: 300 } });
+        if (targetSlide.frameId) {
+          const shape = editor.getShape(targetSlide.frameId as any);
+          if (shape) {
+            const bounds = editor.getShapePageBounds(shape);
+            if (bounds) {
+              editor.zoomToBounds(bounds, { animation: { duration: 300 } });
+            }
           }
         }
       },

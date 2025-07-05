@@ -37,7 +37,7 @@ export function layoutDiagram(diagram: DiagramJSON): PositionedDiagram {
 
   dagre.layout(g)
 
-  const nodes: PositionedNode[] = g.nodes().map((id) => {
+  const nodes: PositionedNode[] = g.nodes().map((id: string) => {
     const dagreNode = g.node(id)
     const originalNode = diagram.nodes.find((n) => n.id === id)
 

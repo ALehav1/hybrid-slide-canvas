@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { ExportService } from '@/lib/services/ExportService'
 import { saveAs } from 'file-saver'
 import jsPDF from 'jspdf'
-import type { Editor } from '@tldraw/tldraw'
+import type { Editor, TLShapeId } from '@tldraw/tldraw'
 
 // Mock dependencies
 vi.mock('file-saver', () => ({
@@ -18,36 +18,74 @@ vi.mock('jspdf', () => ({
   })),
 }))
 
-// Mock global URL methods
-const mockCreateObjectURL = vi.fn(() => 'mock-url')
-const mockRevokeObjectURL = vi.fn()
-global.URL.createObjectURL = mockCreateObjectURL
-global.URL.revokeObjectURL = mockRevokeObjectURL
+// Mock FileReader for PDF export
+interface MockFileReader {
+  readAsDataURL: ReturnType<typeof vi.fn>
+  result: string
+  onload: (() => void) | null
+  onerror: (() => void) | null
+}
+
+let mockFileReader: MockFileReader
+
+beforeAll(() => {
+  // Mock FileReader used by blobToDataUrl
+  mockFileReader = {
+    readAsDataURL: vi.fn(),
+    result: 'data:image/png;base64,mock-data-url',
+    onload: null,
+    onerror: null
+  }
+  
+  global.FileReader = vi.fn(() => {
+    return mockFileReader as unknown as FileReader
+  }) as unknown as typeof FileReader
+  
+  // Mock FileReader async behavior
+  mockFileReader.readAsDataURL.mockImplementation(() => {
+    setTimeout(() => mockFileReader.onload?.(), 0)
+  })
+})
 
 // Mock Image global for loadImage helper
-global.Image = class {
-  onload: () => void = () => {}
-  onerror: () => void = () => {}
-  src: string = ''
-  width: number = 100
-  height: number = 50
+global.Image = class MockImage {
+  onload: (() => void) | null = null
+  onerror: (() => void) | null = null
+  width = 100
+  height = 50
+  
   constructor() {
-    setTimeout(() => this.onload(), 50) // Simulate async loading
-    return this
+    // Simulate successful image load
+    setTimeout(() => {
+      this.onload?.()
+    }, 0)
   }
-} as any
+  
+  set src(_: string) {
+    // Trigger load on src assignment
+  }
+} as unknown as typeof globalThis.Image
 
 describe('ExportService', () => {
   let editor: Editor
   let exportService: ExportService
+  let mockShapeIds: TLShapeId[]
 
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Create a mock editor
+    // Create mock shape IDs with proper typing
+    mockShapeIds = ['shape1' as TLShapeId, 'shape2' as TLShapeId]
+    
+    // Create a mock editor with tldraw v3 API
     editor = {
-      getImage: vi.fn().mockResolvedValue(new Blob(['png-data'], { type: 'image/png' })),
-    } as any
+      toImage: vi.fn().mockResolvedValue({
+        blob: new Blob(['png-data'], { type: 'image/png' }),
+        width: 100,
+        height: 50
+      }),
+      getCurrentPageShapeIds: vi.fn().mockReturnValue(mockShapeIds)
+    } as unknown as Editor
 
     exportService = new ExportService(editor)
   })
@@ -56,55 +94,44 @@ describe('ExportService', () => {
     it('should export canvas as PNG with default filename', async () => {
       await exportService.exportPNG()
 
-      expect(editor.getImage).toHaveBeenCalledWith('png')
+      expect(editor.toImage).toHaveBeenCalledWith(mockShapeIds, { format: 'png', background: true })
       expect(saveAs).toHaveBeenCalledWith(expect.any(Blob), 'slide.png')
     })
 
     it('should export canvas as PNG with a custom filename', async () => {
-      await exportService.exportPNG('custom-name.png')
+      await exportService.exportPNG(mockShapeIds, 'custom-name.png')
 
+      expect(editor.toImage).toHaveBeenCalledWith(mockShapeIds, { format: 'png', background: true })
       expect(saveAs).toHaveBeenCalledWith(expect.any(Blob), 'custom-name.png')
     })
   })
 
   describe('exportPDF', () => {
     it('should export canvas as PDF with correct dimensions and filename', async () => {
-      await exportService.exportPDF('my-slide.pdf')
+      await exportService.exportPDF(mockShapeIds, 'my-slide.pdf')
 
       // 1. Get PNG with scale
-      expect(editor.getImage).toHaveBeenCalledWith('png', { scale: 2 })
+      expect(editor.toImage).toHaveBeenCalledWith(mockShapeIds, { format: 'png', scale: 2 })
 
-      // 2. Create object URL
-      expect(mockCreateObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+      // 2. Convert blob to data URL via FileReader
+      expect(global.FileReader).toHaveBeenCalled()
+      expect(mockFileReader.readAsDataURL).toHaveBeenCalledWith(expect.any(Blob))
 
-      // 3. Initialize jsPDF
-      expect(jsPDF).toHaveBeenCalledWith({ orientation: 'l', unit: 'pt', format: 'a4' })
+      // 3. Initialize jsPDF with image dimensions
+      expect(jsPDF).toHaveBeenCalledWith('l', 'px', [100, 50])
 
-      // 4. Add image to PDF with correct fitting logic
-      // A4 landscape (842x595) with 24pt margin = 794x547
-      // Image is 100x50, so scale = min(794/100, 547/50) = 7.94
-      // drawW = 100 * 7.94 = 794, drawH = 50 * 7.94 = 397
-      const expectedW = 794
-      const expectedH = 397
-      const expectedX = (842 - expectedW) / 2 // Centered X
-      const expectedY = (842 - expectedH) / 2 // Centered Y
-
+      // 4. Add image to PDF
       expect(mockAddImage).toHaveBeenCalledWith(
-        'mock-url',
+        'data:image/png;base64,mock-data-url',
         'PNG',
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number),
-        expect.any(Number),
-        undefined,
-        'FAST'
+        0,
+        0,
+        100,
+        50
       )
 
       // 5. Save PDF
       expect(mockSave).toHaveBeenCalledWith('my-slide.pdf')
-
-      // 6. Clean up object URL
-      expect(mockRevokeObjectURL).toHaveBeenCalledWith('mock-url')
     })
   })
 })

@@ -1,310 +1,401 @@
 /**
- * IndexedDB Middleware for Zustand
+ * IndexedDB Persistence Middleware for Zustand
  * 
- * Custom middleware to persist Zustand store state to IndexedDB.
- * Supports:
- * - Selective persistence of store slices
- * - Automatic data migration
- * - Optimistic updates
- * - Error handling and retries
- * - Performance optimizations
+ * This middleware enables automatic persistence of Zustand store state to IndexedDB.
+ * It's designed to work with the corrected IndexedDB module and integrates with Immer.
  * 
  * @module indexedDbMiddleware
  */
 
-import { type StateCreator, type StoreMutatorIdentifier } from 'zustand';
+import type { StateCreator, StoreApi } from 'zustand';
+import { produce, type Draft } from 'immer';
 import { logger } from '../utils/logging';
+import type { StoreName } from './indexedDb';
 import * as idb from './indexedDb';
 
 /**
- * Options for the IndexedDB middleware
+ * Options for IndexedDB persistence middleware
  */
-interface IndexedDBOptions<T> {
-  /** IndexedDB store name */
-  storeName: keyof ReturnType<typeof idb.getDatabase>['objectStores'];
-  
-  /** Unique identifier for the record */
-  id: string;
-  
-  /** Function to extract persistable state from the store */
-  serialize?: (state: T) => any;
-  
-  /** Function to merge loaded state with initial state */
-  deserialize?: (persistedState: any, currentState: T) => T;
-  
-  /** How often to persist state changes (in milliseconds) */
+export interface IndexedDbOptions<T> {
+  /** A unique name for this store instance (used as the key in IndexedDB) */
+  name: string;
+  /** The name of the IndexedDB store to use (e.g., 'slides', 'conversations') */
+  storeName: StoreName;
+  /** Function to serialize state before storing */
+  serialize?: (state: T) => unknown;
+  /** Function to deserialize state after retrieval */
+  deserialize?: (storedState: unknown) => T;
+  /** Function to merge persisted state with current state */
+  merge?: (persistedState: T, currentState: T) => T;
+  /** Debounce time in ms for saving state changes (0 for no debounce) */
   debounceTime?: number;
-  
-  /** Whether to immediately hydrate state on initialization */
-  hydrate?: boolean;
-
-  /**
-   * Filter function to determine which parts of the state should trigger persistence
-   * Return true if the state change should trigger a persist operation
-   */
-  shouldPersist?: (previousState: T, currentState: T) => boolean;
-  
-  /** Whether to enable debug logging */
-  debug?: boolean;
-  
-  /** Auto-initialize database on middleware creation */
-  autoInit?: boolean;
-  
-  /** Storage version for data migrations */
-  version?: number;
+  /** Whether to skip hydration on init */
+  skipHydration?: boolean;
+  /** Called when hydration is finished */
+  onRehydrateStorage?: (state: T | undefined) => ((state: T | undefined, error?: Error) => void) | undefined;
+  /** Function to handle errors during persistence operations */
+  onError?: (error: Error) => void;
 }
 
 /**
- * Default middleware options
+ * Type guard to validate stored data structure
  */
-const defaultOptions = {
-  debounceTime: 1000, // Default to 1 second debounce
-  hydrate: true,
-  debug: false,
-  autoInit: true,
-  version: 1,
-  serialize: <T>(state: T) => state,
-  deserialize: <T>(persistedState: any, currentState: T) => ({
-    ...currentState,
-    ...persistedState,
-  }),
-  shouldPersist: () => true,
-};
-
-/**
- * Type for the persist function returned by the middleware
- */
-interface PersistApi {
-  /**
-   * Persist current state immediately
-   */
-  persist: () => Promise<void>;
-  
-  /**
-   * Clear persisted state
-   */
-  clear: () => Promise<void>;
-  
-  /**
-   * Check if data is currently hydrated
-   */
-  hasHydrated: () => boolean;
-  
-  /**
-   * Rehydrate state from storage
-   */
-  rehydrate: () => Promise<void>;
-}
-
-/**
- * Type for a store with persistence capabilities
- */
-type StoreWithPersist<T> = T & {
-  persist: PersistApi;
-};
-
-declare module 'zustand' {
-  interface StoreMutators<S, A> {
-    'zustand/persist-indexeddb': WithPersist<S, A>;
-  }
-}
-
-type WithPersist<S, A> = S extends { getState: () => infer T }
-  ? StoreWithPersist<S>
-  : S;
-
-type IndexedDbMiddleware = <
-  T,
-  Mps extends [StoreMutatorIdentifier, unknown][] = [],
-  Mcs extends [StoreMutatorIdentifier, unknown][] = [],
->(
-  f: StateCreator<T, Mps, Mcs>,
-  options: IndexedDBOptions<T>,
-) => StateCreator<T, Mps, [['zustand/persist-indexeddb', unknown]]>;
-
-/**
- * Create a Zustand middleware for persisting state to IndexedDB
- */
-export const createIndexedDbMiddleware: IndexedDbMiddleware = (f, userOptions) => (set, get, store) => {
-  // Merge default options with user options
-  const options = {
-    ...defaultOptions,
-    ...userOptions,
-  } as Required<IndexedDBOptions<unknown>>;
-
-  if (options.debug) {
-    logger.debug('Creating IndexedDB middleware', { options });
-  }
-
-  // Track hydration state
-  let hasHydrated = false;
-  
-  // Setup debounce timer
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  
-  // Initialize database if auto-init is enabled
-  if (options.autoInit) {
-    idb.initDatabase().catch((error) => {
-      logger.error('Failed to initialize IndexedDB', error);
-    });
-  }
-
-  /**
-   * Persist current state to IndexedDB
-   */
-  const persistState = async (): Promise<void> => {
-    try {
-      // Get current state
-      const state = get();
-      
-      // Serialize state according to options
-      const serializedState = options.serialize(state);
-      
-      // Store in IndexedDB
-      const record = {
-        id: options.id,
-        state: serializedState,
-        version: options.version,
-        updatedAt: Date.now(),
-      };
-      
-      await idb.storeData(options.storeName, record);
-      
-      if (options.debug) {
-        logger.debug('State persisted to IndexedDB', { storeName: options.storeName, id: options.id });
-      }
-    } catch (error) {
-      logger.error('Failed to persist state to IndexedDB', {
-        error,
-        storeName: options.storeName,
-        id: options.id,
-      });
-    }
-  };
-
-  /**
-   * Load persisted state from IndexedDB
-   */
-  const loadState = async (): Promise<void> => {
-    try {
-      // Get state from IndexedDB
-      const record = await idb.getData(options.storeName, options.id);
-      
-      if (!record) {
-        if (options.debug) {
-          logger.debug('No persisted state found', { storeName: options.storeName, id: options.id });
-        }
-        return;
-      }
-      
-      // Get current state
-      const currentState = get();
-      
-      // Deserialize state according to options
-      const newState = options.deserialize(record.state, currentState);
-      
-      // Update state
-      set(newState, true);
-      
-      if (options.debug) {
-        logger.debug('State loaded from IndexedDB', { storeName: options.storeName, id: options.id });
-      }
-    } catch (error) {
-      logger.error('Failed to load state from IndexedDB', {
-        error,
-        storeName: options.storeName,
-        id: options.id,
-      });
-    } finally {
-      hasHydrated = true;
-    }
-  };
-
-  /**
-   * Persist API exposed to the store
-   */
-  const persistApi: PersistApi = {
-    persist: persistState,
-    clear: async () => {
-      try {
-        await idb.deleteData(options.storeName, options.id);
-        if (options.debug) {
-          logger.debug('Persisted state cleared', { storeName: options.storeName, id: options.id });
-        }
-      } catch (error) {
-        logger.error('Failed to clear persisted state', {
-          error,
-          storeName: options.storeName,
-          id: options.id,
-        });
-      }
-    },
-    hasHydrated: () => hasHydrated,
-    rehydrate: async () => {
-      await loadState();
-    },
-  };
-
-  // Create the actual store with the original state creator
-  const initialState = f(
-    // Custom set function that triggers persistence
-    (stateOrUpdater, replace) => {
-      // Get previous state for comparison
-      const previousState = get();
-      
-      // Call the original set function
-      set(stateOrUpdater, replace);
-      
-      // Get the new state after the update
-      const newState = get();
-      
-      // Check if we should persist this state change
-      if (options.shouldPersist(previousState, newState)) {
-        // Cancel existing debounce timer
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-        
-        // Start a new debounce timer
-        debounceTimer = setTimeout(() => {
-          persistState().catch((error) => {
-            logger.error('Failed to persist state after debounce', error);
-          });
-          debounceTimer = null;
-        }, options.debounceTime);
-      }
-    },
-    get,
-    store,
+function isValidStoredData(data: unknown): data is { value: unknown; timestamp?: number; id?: string } {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    'value' in data &&
+    data.value !== undefined
   );
+}
 
-  // Merge the persist API into the store
-  Object.assign(store, {
-    persist: persistApi,
-  });
-
-  // Hydrate state if enabled
-  if (options.hydrate) {
-    // Use microtask to ensure we don't block rendering
-    Promise.resolve().then(() => {
-      loadState().catch((error) => {
-        logger.error('Failed to hydrate state', error);
-      });
-    });
-  }
-
-  return {
-    ...initialState,
-    persist: persistApi,
-  };
+/**
+ * Default error handler
+ */
+const defaultOnError = (error: Error) => {
+  logger.error('IndexedDB persistence error:', error);
 };
 
 /**
- * Helper function to create a persisted store with IndexedDB
+ * Default serializer
  */
-export const createIndexedDbStore = <T,>(
-  f: StateCreator<T>,
-  options: IndexedDBOptions<T>,
-): StoreWithPersist<ReturnType<typeof f>> => {
-  return f(createIndexedDbMiddleware<T>(f, options)) as StoreWithPersist<ReturnType<typeof f>>;
+const defaultSerialize = <T>(state: T): string => {
+  try {
+    return JSON.stringify(state);
+  } catch (error) {
+    throw new Error(`Failed to serialize state: ${(error instanceof Error ? error.message : String(error))}`);
+  }
+};
+
+/**
+ * Default deserializer
+ */
+const defaultDeserialize = <T>(serializedState: unknown): T => {
+  try {
+    return JSON.parse(serializedState as string) as T;
+  } catch (error) {
+    throw new Error(`Failed to deserialize state: ${(error instanceof Error ? error.message : String(error))}`);
+  }
+};
+
+/**
+ * Default merge function that combines persisted and current state
+ */
+const defaultMerge = <T>(persistedState: T, currentState: T): T => {
+  return { ...currentState, ...persistedState };
+};
+
+/**
+ * Creates a debounced version of a function
+ */
+function debounce<F extends (...args: Parameters<F>) => ReturnType<F>>(
+  func: F,
+  wait: number
+): F {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  
+  return ((...args: Parameters<F>) => {
+    if (timeout !== null) {
+      clearTimeout(timeout);
+    }
+    
+    timeout = setTimeout(() => {
+      func(...args);
+      timeout = null;
+    }, wait);
+  }) as F;
+}
+
+/**
+ * Creates store-specific data structure based on the store name
+ * This ensures we match the expected schema for each store
+ */
+function createStoreData(storeName: StoreName, id: string, serializedData: unknown): Record<string, unknown> {
+  switch (storeName) {
+    case 'settings':
+      // Settings store accepts any value
+      return {
+        id,
+        value: serializedData
+      };
+    case 'slideContent':
+      // SlideContent store accepts any value
+      return {
+        id,
+        value: serializedData
+      };
+    case 'slides':
+      // Slides store has a specific structure
+      return {
+        id,
+        title: `State: ${id}`,
+        updatedAt: Date.now(),
+        value: serializedData // Store the serialized data in a custom field
+      };
+    case 'conversations':
+      // Conversations store has a specific structure
+      return {
+        slideId: id,
+        messages: [],
+        lastModified: Date.now(),
+        value: serializedData // Store the serialized data in a custom field
+      };
+    default:
+      // Generic fallback
+      return {
+        id,
+        value: serializedData
+      };
+  }
+}
+
+/**
+ * Extract serialized data from store-specific structure
+ */
+function extractStoredData(storeName: StoreName, data: Record<string, unknown>): unknown {
+  if (!data) return undefined;
+  
+  switch (storeName) {
+    case 'settings':
+    case 'slideContent':
+      return data.value;
+    case 'slides':
+    case 'conversations':
+      return data.value || data; // Try to get the value field, fallback to the whole object
+    default:
+      return data.value !== undefined ? data.value : data;
+  }
+}
+
+/**
+ * Creates a type-safe IndexedDB persistence middleware for Zustand
+ * @param options Configuration options for the persistence middleware
+ * @returns A Zustand middleware function
+ */
+export const createIndexedDbMiddleware = <T>(
+  options: IndexedDbOptions<T>
+) => {
+  // Default options
+  const {
+    name, // Required: unique name for this store instance
+    storeName, // Required: IndexedDB store name
+    serialize = defaultSerialize,
+    deserialize = defaultDeserialize,
+    merge = defaultMerge,
+    debounceTime = 500,
+    skipHydration = false,
+    onRehydrateStorage,
+    onError = defaultOnError,
+  } = options;
+
+  let hasHydrated = false;
+  let isInitialized = false;
+
+  // Function to save state to IndexedDB
+  const saveState = async (state: T): Promise<void> => {
+    try {
+      const serializedData = serialize(state);
+      const storeData = createStoreData(storeName, name, serializedData);
+      await idb.storeData(storeName, storeData);
+      logger.debug(`Saved state to IndexedDB store '${storeName}' with key '${name}'`);
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error(`Failed to save state to IndexedDB:`, err);
+      onError(err);
+    }
+  };
+
+  // Create debounced save function if debouncing is enabled
+  const debouncedSaveState = debounceTime > 0 ? debounce(saveState, debounceTime) : null;
+
+  return (config: StateCreator<T, [], []>): StateCreator<T, [], []> => {
+    return (set, get, store) => {
+      // Function to load state from IndexedDB and hydrate store
+      const loadFromStorage = async (): Promise<void> => {
+        try {
+          // Use the direct getData function
+          const key = storeName === 'conversations' ? name : name;
+          const storedData = await idb.getData(storeName, key);
+          
+          if (storedData) {
+            // Extract the serialized data from the store-specific structure
+            const serializedData = extractStoredData(storeName, storedData as Record<string, unknown>);
+            
+            if (serializedData !== undefined) {
+              const deserializedState = deserialize(serializedData);
+              
+              // Set the hydrated state to the store
+              const currentState = get();
+              const mergedState = merge(deserializedState, currentState);
+              set(mergedState, true); // Replace the entire state
+              
+              logger.debug(`Hydrated state from IndexedDB store '${storeName}' with key '${name}'`);
+            }
+          }
+          
+          // Call rehydrate callback if provided
+          if (onRehydrateStorage) {
+            const callback = onRehydrateStorage(get());
+            if (callback) {
+              callback(get());
+            }
+          }
+        } catch (error) {
+          const err = error instanceof Error ? error : new Error(String(error));
+          logger.error(`Failed to load state from IndexedDB:`, err);
+          onError(err);
+          
+          // Call rehydrate callback with error if provided
+          if (onRehydrateStorage) {
+            const callback = onRehydrateStorage(undefined);
+            if (callback) {
+              callback(undefined, err);
+            }
+          }
+        } finally {
+          hasHydrated = true;
+        }
+      };
+
+      // Custom set function that triggers persistence
+      const persistentSet = (stateOrUpdater: T | Partial<T> | ((state: T) => T | Partial<T>), replace?: boolean) => {
+        // Call original set function
+        set(stateOrUpdater, replace);
+        
+        // Only persist after initial hydration to avoid saving incomplete state
+        if (hasHydrated && isInitialized) {
+          if (debounceTime > 0 && debouncedSaveState) {
+            debouncedSaveState(get()); // Pass current state to debounced function
+          } else {
+            void saveState(get()); // Pass current state to immediate save
+          }
+        }
+      };
+
+      // Initialize the store with the original state creator
+      const storeState = config(persistentSet, get, store);
+      isInitialized = true;
+
+      // Start hydration if not skipped
+      if (!skipHydration) {
+        void loadFromStorage();
+      } else {
+        hasHydrated = true;
+      }
+
+      // Add persistence API to the store
+      return {
+        ...storeState,
+        // Persistence methods
+        persist: {
+          hasHydrated: () => hasHydrated,
+          rehydrate: () => loadFromStorage(),
+          clear: async () => {
+            try {
+              // For 'conversations' store, the key is 'slideId', which is 'name' in this context
+              const keyForDelete = storeName === 'conversations' ? name : name;
+              await idb.deleteData(storeName, keyForDelete);
+              logger.debug(`Cleared persisted state from IndexedDB store '${storeName}' with key '${name}'`);
+            } catch (error) {
+              const err = error instanceof Error ? error : new Error(String(error));
+              logger.error(`Failed to clear persisted state:`, err);
+              onError(err);
+            }
+          },
+          save: () => saveState(get()), // Pass current state to save
+        },
+      };
+    };
+  };
+}
+
+/**
+ * Type-safe middleware for persisting Zustand store state in IndexedDB
+ * @param options Configuration options for the persistence middleware
+ * @returns A Zustand middleware function
+ */
+export const persistWithIndexedDb = <T>(
+  options: IndexedDbOptions<T>
+) => {
+  return createIndexedDbMiddleware<T>(options);
+};
+
+/**
+ * Helper function to clear persisted state for a specific store instance
+ * @param name The unique name of the store instance
+ * @param storeName The IndexedDB store name
+ */
+export const clearPersistedState = async (
+  name: string, // The unique name of the store instance
+  storeName: StoreName // The IndexedDB store name
+): Promise<void> => {
+  try {
+    // Use the direct deleteData function
+    const key = storeName === 'conversations' ? name : name;
+    await idb.deleteData(storeName, key);
+    logger.info(`Cleared persisted state for '${name}' in IndexedDB store '${storeName}'`);
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error(`Failed to clear persisted state:`, err);
+    throw err;
+  }
+};
+
+/**
+ * Helper function to get persisted state for debugging or initial hydration
+ * @param name The unique name of the store instance
+ * @param storeName The IndexedDB store name
+ * @param deserialize Custom deserializer function
+ * @returns The deserialized state, or null if not found
+ */
+export const getPersistedState = async <T>(
+  name: string, // The unique name of the store instance
+  storeName: StoreName, // The IndexedDB store name
+  deserialize: (data: unknown) => T = JSON.parse as (data: unknown) => T // Use defaultDeserialize
+): Promise<T | null> => {
+  try {
+    // Use the direct getData function
+    const key = storeName === 'conversations' ? name : name;
+    const storedData = await idb.getData(storeName, key);
+    
+    // Extract the serialized data from the store-specific structure
+    const serializedData = extractStoredData(storeName, storedData as Record<string, unknown>);
+    
+    if (serializedData !== undefined) {
+      return deserialize(serializedData);
+    }
+    
+    return null;
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error(`Failed to get persisted state for '${name}':`, err);
+    throw err;
+  }
+};
+
+/**
+ * Middleware that combines Immer and IndexedDB persistence for Zustand stores.
+ * @param options Configuration options for the persistence middleware
+ * @returns A Zustand middleware function
+ */
+export const immerPersistWithIndexedDb = <T>(
+  options: IndexedDbOptions<T>
+) => {
+  return (config: StateCreator<T, [["zustand/immer", never]], []>): StateCreator<T, [], []> => {
+    return persistWithIndexedDb<T>(options)(
+      (set, get, store) => config(
+        (stateOrFn) => {
+          // This handles the Immer `Draft` type correctly
+          if (typeof stateOrFn === 'function') {
+            // `produce` returns a new immutable state of type T
+            set(produce(stateOrFn as (state: Draft<T>) => void) as T);
+          } else {
+            set(stateOrFn);
+          }
+        },
+        get,
+        store as StoreApi<T> & { setState: (nextStateOrUpdater: T | Partial<T> | ((state: Draft<T>) => void), shouldReplace?: boolean) => void }
+      )
+    );
+  };
 };

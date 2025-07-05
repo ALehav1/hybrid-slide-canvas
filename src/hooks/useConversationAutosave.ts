@@ -36,7 +36,10 @@ export function useConversationAutosave(
 
       try {
         logger.debug('Saving conversation state via debounced hook', { isChatExpanded });
-        await conversationStore.setItem(CONVERSATION_STORE_KEY, { state: stateToSave });
+        // Safeguard: conversationStore may be undefined in certain test environments
+        if (conversationStore) {
+          await conversationStore.setItem(CONVERSATION_STORE_KEY, { state: stateToSave });
+        }
       } catch (error) {
         logger.error('Failed to save conversation state', error as Error);
       } finally {

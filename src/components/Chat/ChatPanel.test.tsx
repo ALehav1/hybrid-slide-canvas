@@ -18,6 +18,7 @@ import {
   afterEach,
   it,
   expect,
+  type Mock,
 } from 'vitest'
 import '@testing-library/jest-dom'
 
@@ -128,7 +129,7 @@ const renderWithProviders = (
     submitUserMessage: vi.fn(),
   }
 
-  ;(useConversationContext as unknown as vi.Mock).mockReturnValue({
+  ;(useConversationContext as Mock).mockReturnValue({
     ...baseCtx,
     ...overrides,
   })

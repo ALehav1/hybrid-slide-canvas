@@ -38,6 +38,8 @@ const customComponents: Partial<TLComponents> = {
  * Uses TLDraw's official components API instead of children for UI customization
  */
 export const CanvasSlide: React.FC<Props> = ({ slideId: _slideId, store, onMount, onEditorMount, className = '' }) => {
+  // slideId is required by Props interface but not used internally
+  void _slideId;
   // Create a local store if none provided
   const tlStore = store || createTLStore({ shapeUtils: [...defaultShapeUtils, FreeDrawShapeUtil] });
   // Use React 19's Suspense for async loading of the canvas
@@ -51,7 +53,7 @@ export const CanvasSlide: React.FC<Props> = ({ slideId: _slideId, store, onMount
             // Call both callbacks for backward compatibility
             onMount?.(editor);
             onEditorMount?.(editor); // deprecated but still supported
-            applyTheme(editor);
+            applyTheme();
           } catch (error) {
             console.error('Error mounting TLDraw editor:', error);
           }

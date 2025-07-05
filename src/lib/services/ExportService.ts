@@ -1,68 +1,49 @@
-import { saveAs } from 'file-saver'
-import jsPDF from 'jspdf'
-import type { Editor } from '@tldraw/tldraw'
-
-/** A4 landscape in pt */
-const A4_LANDSCAPE = { w: 842, h: 595 }   // 72 pt/in × 11.69 in, 8.27 in
+import { Editor } from '@tldraw/tldraw'
+import type { TLShapeId } from '@tldraw/tldraw'
+import { saveAs }               from 'file-saver'
+import jsPDF                   from 'jspdf'
 
 export class ExportService {
   constructor(private editor: Editor) {}
 
-  /* ---------- PNG ---------- */
-
-  /** Exports the current canvas as a PNG and forces download. */
-  async exportPNG(fileName = 'slide.png') {
-    const blob = await this.editor.getImage('png')             // native helper
-    saveAs(blob, fileName)
+  /** PNG (or JPEG / WebP) */
+  async exportPNG(
+    ids: TLShapeId[] = [...this.editor.getCurrentPageShapeIds()],
+    file = 'slide.png'
+  ) {
+    if (!ids.length) return
+    const { blob } = await this.editor.toImage(ids, { format: 'png', background: true })
+    saveAs(blob, file)
   }
 
-  /* ---------- PDF ---------- */
+  /** SVG */
+  async exportSVG(
+    ids: TLShapeId[] = [...this.editor.getCurrentPageShapeIds()],
+    file = 'slide.svg'
+  ) {
+    if (!ids.length) return
+    const result = await this.editor.getSvgString(ids)   // <- vector!
+    if (!result?.svg) return
+    const blob = new Blob([result.svg], { type: 'image/svg+xml' })
+    saveAs(blob, file)
+  }
 
-  /**
-   * Exports the current canvas into a single-page, A4-landscape PDF.
-   * Keeps aspect ratio; fits inside page with 24 pt margin.
-   */
-  async exportPDF(fileName = 'slide.pdf') {
-    // 1. Get PNG first
-    const blob = await this.editor.getImage('png', { scale: 2 }) // retina
-    const dataUrl = URL.createObjectURL(blob)
-
-    // 2. Create PDF
-    const pdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'a4' })
-
-    // 3. Compute fitted size
-    const img = await loadImage(dataUrl)
-    const maxW = A4_LANDSCAPE.w - 48         // 24 pt margin each side
-    const maxH = A4_LANDSCAPE.h - 48
-    const { drawW, drawH } = fit(img.width, img.height, maxW, maxH)
-
-    pdf.addImage(dataUrl, 'PNG',
-      (A4_LANDSCAPE.w - drawW) / 2,
-      (A4_LANDSCAPE.h - drawH) / 2,
-      drawW,
-      drawH,
-      undefined,
-      'FAST'                                // no fancy down-sampling
-    )
-
-    // 4. Finish
-    pdf.save(fileName)
-    URL.revokeObjectURL(dataUrl)
+  /** PDF (embed high-res PNG) */
+  async exportPDF(
+    ids: TLShapeId[] = [...this.editor.getCurrentPageShapeIds()],
+    file = 'slide.pdf'
+  ) {
+    if (!ids.length) return
+    const { blob, width, height } = await this.editor.toImage(ids, { format: 'png', scale: 2 })
+    const dataUrl = await blobToDataUrl(blob)
+    const pdf = new jsPDF(width > height ? 'l' : 'p', 'px', [width, height])
+    pdf.addImage(dataUrl, 'PNG', 0, 0, width, height)
+    pdf.save(file)
   }
 }
 
-/* ---------- helpers ---------- */
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = url
+/* util */
+const blobToDataUrl = (b: Blob) =>
+  new Promise<string>((res, rej) => {
+    const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result as string); r.readAsDataURL(b)
   })
-}
-
-function fit(w: number, h: number, maxW: number, maxH: number) {
-  const scale = Math.min(maxW / w, maxH / h)
-  return { drawW: w * scale, drawH: h * scale }
-}

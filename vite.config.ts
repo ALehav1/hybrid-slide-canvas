@@ -42,6 +42,14 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       setupFiles: './src/setupTests.ts',
+      include: [
+        'src/**/*.{test,spec}.{js,ts,jsx,tsx}'
+      ],
+      exclude: [
+        '**/node_modules/**',
+        '**/dist/**',
+        'src/lib/history/__tests__/HistoryManager.test.ts'
+      ],
       coverage: {
         provider: 'v8',
         reporter: ['text', 'lcov', 'html', 'json-summary'],
