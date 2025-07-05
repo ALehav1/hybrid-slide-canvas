@@ -139,7 +139,7 @@ src/
 #### Expert-Guided Solution Applied:
 
 1. **Legacy File Removal**: Deleted obsolete `tldrawHistoryIntegration.ts` that was causing import conflicts
-2. **Test Exclusion**: Temporarily disabled `HistoryManager.test.ts` that depended on removed legacy code
+2. **Interface Completion**: Fixed `HistoryManager.test.ts` compatibility after legacy code removal
 3. **Interface Completion**: Added missing `setOrigin` method to satisfy `HistoryStore` interface in `useHistoryManager.ts`
 
 #### Results:
