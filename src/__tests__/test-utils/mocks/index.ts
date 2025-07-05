@@ -9,7 +9,7 @@
 export { default as mockIndexedDb } from './indexedDb';
 export { default as mockNanoid } from './nanoid';
 export { default as mockDexie } from './dexie';
-export { default as mockOpenAI } from './openaiClient';
+export { openai as mockOpenAI } from './openaiClient';
 
 // Re-export any existing mocks
 export { mockEditor } from './tldraw';

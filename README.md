@@ -155,6 +155,31 @@ src/
 
 **Process Learning**: Identified that hasty, unplanned coding caused many issues. Established mandatory research-driven, systematic planning process for all future development.
 
+### 2025-07-05 — ConversationProvider Async Testing Resolution
+
+**CRITICAL BREAKTHROUGH: Complete resolution of complex async testing timing conflicts**
+
+- **Root Cause Analysis**: The ConversationProvider test timeouts were NOT caused by async storage state transitions, but by three specific issues:
+  1. **Mock Export Mismatches**: Tests were importing named exports (`logger`, `openai`) but mocks were providing default exports
+  2. **Timer Handling Conflicts**: Mixed fake/real timer usage created race conditions in debounced operations
+  3. **Schema Validation Errors**: AI response format didn't match expected `AiActionSchema` structure
+
+- **Complete Solution Applied**:
+  1. **Mock Alignment**: Fixed all mock exports to use named exports matching actual imports
+  2. **Timer Simplification**: Used real timers throughout with shortened 50ms debounce timeout for testing
+  3. **Schema Correctness**: Fixed AI response format to use `addShape`/`shape` instead of `add_shape`/`shapeType`
+  4. **Robust Test Patterns**: Established reliable `waitFor()` patterns with appropriate timeouts and intervals
+
+- **Results**: All 4 ConversationProvider tests now pass consistently (hydration, debouncing, error handling, AI integration)
+
+**Key Technical Insights:**
+- Mock export alignment is critical - named vs default exports must match exactly
+- Real timers are often more reliable than fake timers for complex async component testing
+- Schema validation errors can cascade into timing issues, masking the real problem
+- Pause-and-research approach prevents wasted effort on incorrect assumptions
+
+**Process Validation**: This demonstrates the power of systematic root cause analysis vs. trial-and-error approaches. The research-driven methodology successfully identified and resolved a complex multi-factor issue.
+
 ### 2025-07-05 — MVP Phase 3: Export Functionality
 
 - **Added Export Service**: Created `ExportService.ts` to handle the logic for exporting the canvas to PNG and PDF formats, using `file-saver` and `jspdf`.

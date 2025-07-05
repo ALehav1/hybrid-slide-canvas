@@ -8,11 +8,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Toolbar } from '@/components/Toolbar'
 import { useHistoryStore } from '@/lib/history/useHistoryStore'
-import { EditorContext } from '@/lib/tldraw/EditorContext'
 import { mockEditor } from '@/__tests__/test-utils/mocks/tldraw'
 
 /* ──────────────────────────────────────────────────────────────
-   1 ▸  Mock only the *manager* hook – we don't care about
+   1 ▸  Mock the tldraw useEditor hook to return our mock editor
+       (preserve all other exports using importOriginal)
+   ──────────────────────────────────────────────────────────── */
+vi.mock('@tldraw/tldraw', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tldraw/tldraw')>()
+  return {
+    ...actual,
+    useEditor: () => mockEditor,
+  }
+})
+
+/* ──────────────────────────────────────────────────────────────
+   2 ▸  Mock only the *manager* hook – we don't care about
         its internals for these UI-level tests
    ──────────────────────────────────────────────────────────── */
 const mockManager = {
@@ -22,13 +33,6 @@ const mockManager = {
 vi.mock('@/lib/history/useHistoryManager', () => ({
   useHistoryManager: () => mockManager,
 }))
-
-/* ──────────────────────────────────────────────────────────────
-   2 ▸  Small wrapper that provides the (mocked) tldraw editor
-   ──────────────────────────────────────────────────────────── */
-const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <EditorContext.Provider value={mockEditor}>{children}</EditorContext.Provider>
-)
 
 /* ──────────────────────────────────────────────────────────────
    3 ▸  Baseline state reused by every test
@@ -51,14 +55,14 @@ describe('Toolbar (undo / redo)', () => {
   })
 
   it('buttons start disabled', () => {
-    render(<Toolbar />, { wrapper: Wrapper })
+    render(<Toolbar />)
 
     expect(screen.getByTestId('toolbar-undo-button')).toBeDisabled()
     expect(screen.getByTestId('toolbar-redo-button')).toBeDisabled()
   })
 
   it('enables Undo when user has undoable entries', async () => {
-    render(<Toolbar />, { wrapper: Wrapper })
+    render(<Toolbar />)
 
     // mutate *real* store – component re-renders automatically
     act(() => {
@@ -78,7 +82,7 @@ describe('Toolbar (undo / redo)', () => {
   })
 
   it('clicks call manager.undo / redo', async () => {
-    render(<Toolbar />, { wrapper: Wrapper })
+    render(<Toolbar />)
 
     // give both stacks one entry so buttons are enabled
     act(() => {

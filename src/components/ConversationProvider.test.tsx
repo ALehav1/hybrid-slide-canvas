@@ -13,7 +13,7 @@ import { logger } from '@/lib/utils/logging';
 
 // Mock the debounce timeout to a shorter value for testing
 vi.mock('@/hooks/useConversationAutosave', async (importOriginal) => {
-  const actual = await importOriginal();
+  const actual: Record<string, unknown> = await importOriginal();
   return {
     ...actual,
     SAVE_DEBOUNCE_MS: 50, // Override with a much shorter timeout for tests

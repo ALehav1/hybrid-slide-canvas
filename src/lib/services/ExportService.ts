@@ -43,7 +43,7 @@ export class ExportService {
 }
 
 /* util */
-const blobToDataUrl = (b: Blob) =>
+export const blobToDataUrl = (b: Blob) =>
   new Promise<string>((res, rej) => {
     const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result as string); r.readAsDataURL(b)
   })

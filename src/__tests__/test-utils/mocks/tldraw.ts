@@ -45,6 +45,7 @@ export const mockEditor = {
   getSelectedShapeIdMap: vi.fn().mockReturnValue(new Map()),
   getSelectedShapes: vi.fn().mockReturnValue([]),
   getSvg: vi.fn(),
+  getCurrentToolId: vi.fn().mockReturnValue('select'), // Default to select tool
   // Add any other editor methods you need to mock for your tests
 } as unknown as Editor;
 
