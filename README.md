@@ -424,11 +424,11 @@ hybrid-slide-canvas/
 
 ## Architecture & Patterns
 
-### Multi-Origin Undo/Redo System ⚠️ *Implemented - Tests Disabled*
+### Multi-Origin Undo/Redo System ✅ Production Ready
 
 To provide granular control over the application's history, we have implemented a custom multi-origin undo/redo system. This allows users to selectively undo actions based on their source (e.g., "undo last AI action" without affecting manual edits).
 
-**Current Status**: Fully implemented with 467-line `HistoryManager` class, hook integration (`useHistoryManager`), editor binding (`useEditorHistory`), and UI integration (`Toolbar.tsx`). However, comprehensive tests are currently disabled (`HistoryManager.test.ts.disabled`) and need to be re-enabled and validated.
+Current Status: Fully implemented and tested with 467-line HistoryManager class, hook integration (useHistoryManager), editor binding (useEditorHistory), and UI integration (Toolbar.tsx). Complete test suite passes (HistoryManager.test.ts with 14 tests) and is part of the 88/88 production test suite.
 
 **Logic Flow:**
 
