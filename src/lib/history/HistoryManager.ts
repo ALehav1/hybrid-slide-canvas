@@ -251,7 +251,16 @@ export class HistoryManager {
    * Undo operation
    */
   public undo(origin?: OriginType): boolean {
-    if (!this.editor || !this.store.canUndo(origin)) return false;
+    if (!this.store.canUndo(origin)) return false;
+
+    // First try to delegate to store if it has a custom undo implementation
+    if (typeof this.store.undo === 'function') {
+      this.store.undo(origin);
+      return true;
+    }
+
+    // Fallback for when no editor is available
+    if (!this.editor) return false;
 
     const entries = origin 
       ? this.store.getEntriesByOrigin(origin)
@@ -285,7 +294,16 @@ export class HistoryManager {
    * Redo operation
    */
   public redo(origin?: OriginType): boolean {
-    if (!this.editor || !this.store.canRedo(origin)) return false;
+    if (!this.store.canRedo(origin)) return false;
+
+    // First try to delegate to store if it has a custom redo implementation
+    if (typeof this.store.redo === 'function') {
+      this.store.redo(origin);
+      return true;
+    }
+
+    // Fallback for when no editor is available
+    if (!this.editor) return false;
 
     const entries = origin 
       ? this.store.getEntriesByOrigin(origin)
@@ -415,17 +433,37 @@ export class HistoryManager {
 
   /** remove all entries matching an origin */
   public clearByOrigin(origin: OriginType): void {
+    // Delegate to store if it has a custom implementation
+    if (typeof this.store.clearByOrigin === 'function') {
+      this.store.clearByOrigin(origin);
+      return;
+    }
+
+    // Fallback to default implementation
     this.store.entries = this.store.entries.filter((e) => e.origin !== origin);
     this.updateCurrentIndex();
   }
 
   /** turn recording on/off */
   public setEnabled(enabled: boolean): void {
+    // Delegate to store if it has a custom implementation
+    if (typeof this.store.setEnabled === 'function') {
+      this.store.setEnabled(enabled);
+      return;
+    }
+
+    // Fallback to default implementation
     this.store.isEnabled = enabled;
   }
 
   /** last N active entries helper */
   public getRecentEntries(count: number): HistoryEntry[] {
+    // Delegate to store if it has a custom implementation
+    if (typeof this.store.getRecentEntries === 'function') {
+      return this.store.getRecentEntries(count);
+    }
+
+    // Fallback to default implementation
     return this.store.entries.slice(-count);
   }
 

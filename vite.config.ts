@@ -47,8 +47,7 @@ export default defineConfig(({ mode }) => {
       ],
       exclude: [
         '**/node_modules/**',
-        '**/dist/**',
-        'src/lib/history/__tests__/HistoryManager.test.ts'
+        '**/dist/**'
       ],
       coverage: {
         provider: 'v8',

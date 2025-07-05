@@ -2,7 +2,7 @@ import { vi } from 'vitest';
 
 export const mockOpenAIChatCompletionsCreate = vi.fn();
 
-export default {
+export const openai = {
   chat: {
     completions: {
       create: mockOpenAIChatCompletionsCreate,

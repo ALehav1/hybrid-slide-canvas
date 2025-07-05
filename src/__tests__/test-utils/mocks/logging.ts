@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 
-export default {
+export const logger = {
   debug: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),

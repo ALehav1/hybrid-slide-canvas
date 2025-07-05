@@ -38,9 +38,62 @@ describe('CanvasRenderer', () => {
     expect(mockEditor.createShapes).toHaveBeenCalledTimes(3);
 
     // Check the contents of the shape creation calls
-    expect(mockEditor.createShapes).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ type: 'geo', props: { text: 'Start' } })]));
-    expect(mockEditor.createShapes).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ type: 'geo', props: { text: 'End' } })]));
-    expect(mockEditor.createShapes).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ type: 'arrow' })]));
+    // First call should create 'Start' geo shape with all required properties
+    expect(mockEditor.createShapes).toHaveBeenNthCalledWith(1, expect.arrayContaining([
+      expect.objectContaining({
+        type: 'geo',
+        x: 10,
+        y: 20,
+        props: expect.objectContaining({
+          text: 'Start',
+          geo: 'rect',
+          w: 100,
+          h: 50,
+          align: 'middle',
+          font: 'draw',
+          size: 'm'
+        })
+      })
+    ]));
+    
+    // Second call should create 'End' geo shape with all required properties
+    expect(mockEditor.createShapes).toHaveBeenNthCalledWith(2, expect.arrayContaining([
+      expect.objectContaining({
+        type: 'geo',
+        x: 10,
+        y: 200,
+        props: expect.objectContaining({
+          text: 'End',
+          geo: 'rect',
+          w: 100,
+          h: 50,
+          align: 'middle',
+          font: 'draw',
+          size: 'm'
+        })
+      })
+    ]));
+    
+    // Third call should create arrow with binding properties
+    expect(mockEditor.createShapes).toHaveBeenNthCalledWith(3, expect.arrayContaining([
+      expect.objectContaining({
+        type: 'arrow',
+        props: expect.objectContaining({
+          arrowheadStart: 'none',
+          arrowheadEnd: 'arrow',
+          start: expect.objectContaining({
+            type: 'binding',
+            isExact: false,
+            boundShapeId: expect.any(String)
+          }),
+          end: expect.objectContaining({
+            type: 'binding',
+            isExact: false,
+            boundShapeId: expect.any(String)
+          })
+        })
+      })
+    ]));
   });
 
   it('should orchestrate the full diagram rendering flow from prompt to canvas', async () => {

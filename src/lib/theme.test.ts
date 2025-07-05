@@ -13,7 +13,7 @@ vi.mock('@tldraw/tldraw', () => {
 
 describe('theme', () => {
   // Common mock editor for all tests
-  let mockEditor: any;
+  let mockEditor: { setStyleForNextShapes: ReturnType<typeof vi.fn> };
   
   beforeEach(() => {
     // Create fresh mock editor before each test
@@ -34,7 +34,7 @@ describe('theme', () => {
   describe('applyTheme', () => {
     test('applies correct styles to editor', () => {
       // Call the function with mock editor
-      applyTheme();
+      applyTheme(mockEditor as any);
       
       // Check that it sets the correct styles (anchored by arguments not call index)
       expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledTimes(4);
@@ -48,7 +48,7 @@ describe('theme', () => {
   describe('resetTheme', () => {
     test('resets styles to default values', () => {
       // Call the function with mock editor
-      resetTheme();
+      resetTheme(mockEditor as any);
       
       // Check that it sets the correct default styles (anchored by arguments not call index)
       expect(mockEditor.setStyleForNextShapes).toHaveBeenCalledTimes(4);

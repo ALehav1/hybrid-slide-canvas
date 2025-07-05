@@ -4,7 +4,7 @@ import type { SlideConversation } from '../context/ConversationContext';
 import { logger } from '../lib/utils/logging';
 
 /** milliseconds to debounce */
-const SAVE_DEBOUNCE_MS = 300;
+export const SAVE_DEBOUNCE_MS = 300;
 
 export function useConversationAutosave(
   storageIsLoading: boolean,

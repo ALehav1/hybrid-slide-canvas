@@ -9,6 +9,17 @@ import { useHistoryStore } from '@/lib/history/useHistoryStore';
 import type { HistoryEntry } from '@/lib/types/history';
 import type { HistoryManager } from '@/lib/history/HistoryManager';
 
+// Mock the useEditor hook from tldraw with minimal API surface
+vi.mock('@tldraw/tldraw', () => ({
+  useEditor: () => ({
+    getCurrentToolId: vi.fn(() => 'select'),
+    setCurrentTool: vi.fn(),
+    store: {
+      listen: vi.fn(() => vi.fn()), // Returns unsubscribe function
+    },
+  }),
+}));
+
 // Mock the useHistoryManager hook from its canonical location
 vi.mock('@/lib/history/useHistoryManager');
 

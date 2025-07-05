@@ -19,6 +19,7 @@ describe('AIService', () => {
     const mockApiResponse = {
       choices: [
         {
+          finish_reason: 'tool_calls',
           message: {
             tool_calls: [
               {
@@ -50,6 +51,7 @@ describe('AIService', () => {
     const mockInvalidApiResponse = {
       choices: [
         {
+          finish_reason: 'tool_calls',
           message: {
             tool_calls: [
               {

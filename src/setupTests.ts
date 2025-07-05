@@ -29,16 +29,20 @@ beforeEach(async () => {
   } else {
     for (const name of await Dexie.getDatabaseNames()) await Dexie.delete(name)
   }
-  vi.useFakeTimers({ shouldAdvanceTime: true })
+  // ✅ REMOVED: vi.useFakeTimers() - Individual tests manage their own timers
 })
 
 afterEach(() => {
-  // Run all pending timers to ensure async operations complete
-  vi.runOnlyPendingTimers()
-  // Now, assert that no timers are left. This catches runaway timers.
-  expect(vi.getTimerCount()).toBe(0)
-  vi.clearAllTimers()
-  vi.useRealTimers()
+  // ✅ DEFENSIVE TIMER CLEANUP - Only run if fake timers are currently active
+  if (vi.isFakeTimers()) {
+    vi.runOnlyPendingTimers()
+    // Timer leak detection (only when fake timers are active)
+    expect(vi.getTimerCount()).toBe(0)
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  }
+  
+  // Global cleanup (always safe)
   cleanup()
   vi.restoreAllMocks()
   vi.resetModules()

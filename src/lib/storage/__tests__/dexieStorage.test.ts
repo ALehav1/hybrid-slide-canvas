@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, expect, test } from 'vitest';
+import { beforeEach, afterEach, describe, test, expect } from 'vitest';
 import createDexieStorage, { db } from '../dexieStorage';
 import Dexie from 'dexie';
 
@@ -15,6 +15,7 @@ describe('DexieStorage', () => {
 
   // Open a fresh storage instance for each spec.
   beforeEach(() => {
+    // DexieStorage tests don't need timer mocking - they test IndexedDB operations
     storage = createDexieStorage({ name: testDbName });
   });
 
@@ -24,8 +25,7 @@ describe('DexieStorage', () => {
     if (db.isOpen()) {
       await db.close();
     }
-    // Ensure all async Dexie ops complete and timers are cleared.
-    await vi.runAllTimersAsync();
+    // No timer cleanup needed - these tests don't use timers
   });
 
   test('setItem persists a record and getItem retrieves it', async () => {
@@ -64,8 +64,7 @@ describe('DexieStorage with keyPrefix', () => {
     if (db.isOpen()) {
       await db.close();
     }
-    // Ensure all async Dexie ops complete and timers are cleared.
-    await vi.runAllTimersAsync();
+    // No timer cleanup needed - these tests don't use timers
   });
 
   test('applies the user-defined key prefix', async () => {
@@ -76,8 +75,8 @@ describe('DexieStorage with keyPrefix', () => {
     // Verify directly using a raw Dexie connection.
     const rawDb = new Dexie(testDbName);
     rawDb.version(1).stores({ zustandStore: 'id' });
-    // The record is stored with the key prefix.
-    const record = await rawDb.table('zustandStore').get(`${keyPrefix}${key}`);
+    // The record is stored with the format: storeName:key (note the colon separator)
+    const record = await rawDb.table('zustandStore').get(`${keyPrefix}:${key}`);
     
     expect(record).toBeDefined();
     // The value in the DB is a JSON string of the full StorageValue object.

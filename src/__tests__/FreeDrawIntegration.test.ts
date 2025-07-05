@@ -11,7 +11,11 @@ describe('FreeDrawShapeUtil - Final Integration', () => {
   beforeEach(() => {
     // The ShapeUtil constructor needs an editor, but our methods don't use it.
     // We can pass a minimal mock to satisfy the type signature.
-    const mockEditor = {} as Editor
+    const mockEditor = {
+      user: {
+        getIsDarkMode: () => false // Mock theme context for component rendering
+      }
+    } as Editor
     util = new FreeDrawShapeUtil(mockEditor)
   })
 
@@ -51,7 +55,7 @@ describe('FreeDrawShapeUtil - Final Integration', () => {
     // Access the points to verify they have z coordinate
     const polygon = geometry as Polygon2d
     expect(polygon.vertices[0]).toBeInstanceOf(Vec)
-    expect(polygon.vertices[0].z).toBe(0)
+    expect(polygon.vertices[0].z).toBe(1) // tldraw v3 Vec defaults to z=1
   })
 
   it('should provide svgPath for indicator', () => {
