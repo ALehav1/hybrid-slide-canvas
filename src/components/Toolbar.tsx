@@ -1,18 +1,21 @@
 import React from 'react'
-import { useEditor } from '@tldraw/tldraw'
 import { useHistoryManager } from '@/lib/history/useHistoryManager'
 import { useHistoryStore } from '@/lib/history/useHistoryStore'
 import { ExportMenu } from './ExportMenu'
+import { EditorContext } from '@/context/EditorContext'
 
 export const Toolbar: React.FC = () => {
-	const editor = useEditor()
+	// Consume the editor instance provided by <CanvasRegion/> through context.
+	const editor = React.useContext(EditorContext)
 	const historyManager = useHistoryManager()
 
 	const [isFreeDrawActive, setIsFreeDrawActive] = React.useState(
-		() => editor.getCurrentToolId() === 'free-draw'
+		() => editor?.getCurrentToolId() === 'free-draw'
 	)
 
 	React.useEffect(() => {
+		if (!editor) return
+
 		const unsubscribe = editor.store.listen(() => {
 			setIsFreeDrawActive(editor.getCurrentToolId() === 'free-draw')
 		})
@@ -36,8 +39,17 @@ export const Toolbar: React.FC = () => {
 	}
 
 	const handleSelectFreeDrawTool = React.useCallback(() => {
-		editor.setCurrentTool('free-draw')
+		editor?.setCurrentTool('free-draw')
 	}, [editor])
+
+	// Gracefully handle the period before <CanvasRegion> mounts and provides editor.
+	if (!editor) {
+		return (
+			<div className="h-11 border-b px-2 flex items-center gap-2 bg-white">
+				<span className="text-gray-500">Loading toolbar...</span>
+			</div>
+		)
+	}
 
 	return (
 		<div className="h-11 border-b px-2 flex items-center gap-2 bg-white">

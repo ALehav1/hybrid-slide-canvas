@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useTransition, Suspense, useState, useContext
 import { EditorContext } from '@/context/EditorContext';
 import { useConversationContext } from '../../hooks/useConversationContext';
 import { useEnhancedSlidesStore, type SlidesState } from '../../state/enhancedSlidesStore';
-import { createSketchShape } from '../../lib/tldrawHelpers';
+import { createSketchShape, createTextShape } from '../../lib/tldrawHelpers';
 import { type AiAction } from './aiActions';
 import { AIService } from '@/lib/services/AIService';
 import { CanvasRenderer } from '@/lib/canvas/CanvasRenderer';
@@ -65,6 +65,23 @@ export const ChatPanel: React.FC = () => {
           fill: action.fill,
           w: action.w,
           h: action.h,
+          x: action.x,
+          y: action.y,
+          position: action.position,
+        });
+      }
+    },
+    addText: (action) => {
+      // Ensure correct variant
+      if (editor && action.action === 'addText') {
+        // Debug log to help verify handler invocation & params
+        // eslint-disable-next-line no-console
+        console.log('[ChatPanel] addText handler invoked →', action);
+
+        createTextShape(editor, action.text, {
+          color: action.color,
+          size: action.size,
+          align: action.align,
           x: action.x,
           y: action.y,
           position: action.position,
