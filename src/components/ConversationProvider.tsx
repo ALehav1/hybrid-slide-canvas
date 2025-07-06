@@ -202,6 +202,12 @@ export const ConversationProvider: React.FC<ConversationProviderProps> = ({
 
   const submitUserMessage = useCallback(
     async (slideId: string, content: string): Promise<AiAction | null> => {
+      // DEBUG ────────────────────────────────────────────────────────────
+      // Confirm that submitUserMessage is invoked with expected params.
+      // eslint-disable-next-line no-console
+      console.log('[ConversationProvider] submitUserMessage called', { slideId, content });
+      // ──────────────────────────────────────────────────────────────────
+
       const cacheKey = `${slideId}:${content}`;
       if (responseCache.current.has(cacheKey)) {
         return responseCache.current.get(cacheKey)!;
@@ -221,9 +227,11 @@ You are a specialized AI assistant for a slide presentation application. Your SO
 
 The JSON object must be a discriminated union based on the "action" property.
 
-1. To add a new shape: { "action": "add_shape", "shapeType": "string (e.g., 'rectangle', 'ellipse', 'triangle')", "text": "string (optional)" }
-2. To change the color of existing shapes: { "action": "change_color", "color": "string (e.g., 'red', 'blue', '#FF00FF')", "selector": "string (optional, e.g., 'all', 'selected')" }
-3. To group existing shapes: { "action": "group", "selector": "string (optional, e.g., 'all', 'selected')" }
+1. To add a new shape: { "action": "addShape", "shape": "rectangle|ellipse|diamond|star", "label": "string (optional)", "color": "blue|red|green|purple|orange|black|gray|none (optional)", "fill": "blue|red|green|purple|orange|black|gray|none (optional)", "w": "number (optional)", "h": "number (optional)", "x": "number (optional)", "y": "number (optional)", "position": "center|topLeft|topRight|bottomLeft|bottomRight (optional)" }
+2. To add text or title: { "action": "addText", "text": "string (required - the text content)", "color": "blue|red|green|purple|orange|black|gray|none (optional)", "size": "s|m|l|xl (optional)", "align": "start|middle|end (optional)", "x": "number (optional)", "y": "number (optional)", "position": "center|topLeft|topRight|bottomLeft|bottomRight (optional)" }
+3. To create a complex diagram: { "action": "createDiagram", "prompt": "string (minimum 5 characters describing the diagram)" }
+4. To apply layout to shapes: { "action": "layout", "kind": "flow|grid|timeline" }
+5. To group existing shapes: { "action": "group", "selector": "string (optional)" }
 
 --- END SCHEMA ---
 
@@ -243,6 +251,15 @@ Based on the user request above, generate the corresponding JSON object.`;
 
           const responseContent = completion.choices[0]?.message?.content;
           if (!responseContent) throw new Error('Empty response from AI');
+
+          // ────────────────────────────────────────────────────────────
+          // DEBUG: Inspect the raw AI response BEFORE JSON.parse().
+          // This will appear in the browser console and helps identify
+          // whether the AI is returning plain text or a valid JSON object.
+          // Remove or replace with a proper logger when behaviour is verified.
+          // eslint-disable-next-line no-console
+          console.log('[ConversationProvider] raw AI response:', responseContent);
+          // ────────────────────────────────────────────────────────────
 
           const actionJson = JSON.parse(responseContent);
           const parsedAction = AiActionSchema.safeParse(actionJson);

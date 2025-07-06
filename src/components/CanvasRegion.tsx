@@ -8,7 +8,6 @@ import {
 } from '@tldraw/tldraw';
 
 import { LibraryPanel } from './LibraryPanel';
-import { ChatPanel } from './Chat/ChatPanel';
 import { CanvasSlide } from './CanvasSlide';
 import { SlideRail } from './SlideRail';
 import { useSlidesStore } from '@/state/slidesStore';
@@ -29,7 +28,6 @@ export const CanvasRegion: React.FC<CanvasRegionProps> = ({ onMount }) => {
     <div className="flex h-full">
       <aside className="w-[288px] shrink-0 border-r bg-white flex flex-col">
         <LibraryPanel />
-        <ChatPanel />
       </aside>
 
       <main className="flex-1 flex flex-col">

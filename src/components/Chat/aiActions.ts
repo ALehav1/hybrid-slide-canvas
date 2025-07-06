@@ -35,6 +35,31 @@ export const AiActionSchema = z.discriminatedUnion("action", [
     })
     .strict(),
 
+  /* ------------------------------------------------------------------ */
+  /*  addText – place a text element on the canvas                      */
+  /* ------------------------------------------------------------------ */
+
+  z
+    .object({
+      action: z.literal("addText"),
+
+      // Required text content
+      text: z.string().min(1),
+
+      // Optional styling & geometry
+      color: ColorToken.optional(),
+      size: z.enum(["s", "m", "l", "xl"]).optional(),
+      align: z.enum(["start", "middle", "end"]).optional(),
+
+      // Absolute or relative position
+      x: z.number().optional(),
+      y: z.number().optional(),
+      position: z
+        .enum(["center", "topLeft", "topRight", "bottomLeft", "bottomRight"])
+        .optional(),
+    })
+    .strict(),
+
   z
     .object({
       action: z.literal("layout"),
