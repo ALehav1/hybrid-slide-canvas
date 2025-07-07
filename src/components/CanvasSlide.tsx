@@ -64,6 +64,14 @@ const CanvasSlideInner: React.FC<Props> = ({
     };
   }, []);
 
+  // ---------------------------------------------------------------------
+  //  ⚠️ StrictMode double-mount escape hatch
+  //  TLDraw’s initialization is not idempotent and a full cleanup proved
+  //  error-prone.  We instead ensure the heavy setup logic runs exactly
+  //  once across the mount-unmount-remount sequence using a ref.
+  // ---------------------------------------------------------------------
+  const hasInitialized = React.useRef(false);
+
   // slideId is required by Props interface but not used internally
   void _slideId;
   // ---------------------------------------------------------------------
@@ -94,6 +102,11 @@ const CanvasSlideInner: React.FC<Props> = ({
     (editor: Editor) => {
       // eslint-disable-next-line no-console
       console.log('[CanvasSlide] <Tldraw /> component onMount fired.');
+
+      // Skip re-initialization on the second StrictMode mount
+      if (hasInitialized.current) return;
+      hasInitialized.current = true;
+
       try {
         onMount?.(editor);
         onEditorMount?.(editor); // deprecated but still supported
@@ -101,36 +114,6 @@ const CanvasSlideInner: React.FC<Props> = ({
       } catch (error) {
         console.error('Error mounting TLDraw editor:', error);
       }
-
-      /* -----------------------------------------------------------------
-       * 🚨 StrictMode Compatibility
-       * -----------------------------------------------------------------
-       * React StrictMode intentionally mounts, unmounts, and remounts
-       * components in development to surface lifecycle issues. TLDraw’s
-       * `onMount` callback is invoked on every mount, but *does not* provide
-       * automatic cleanup.  If we create shapes (or perform any action that
-       * mutates the internal TLStore) during the first mount, that state will
-       * “leak” into the second mount—resulting in the **shadow / duplicate
-       * shapes** bug.
-       *
-       * The TLDraw team explicitly recommends returning a cleanup function
-       * from `onMount` (see GitHub issue #5089).  Here we load an **empty
-       * snapshot**, resetting the store to a pristine state so the second
-       * mount starts fresh and no duplicates are produced.
-       * ----------------------------------------------------------------- */
-      return () => {
-        try {
-          const snapshot = editor.getSnapshot();
-          editor.loadSnapshot({
-            store: {}, // 🔄 empty store ⇒ pristine editor
-            schema: snapshot.schema, // keep current schema
-          });
-          // eslint-disable-next-line no-console
-          console.log('[CanvasSlide] <Tldraw /> cleanup – store reset.');
-        } catch (err) {
-          console.error('Error during TLDraw cleanup:', err);
-        }
-      };
     },
     [onMount, onEditorMount],
   );

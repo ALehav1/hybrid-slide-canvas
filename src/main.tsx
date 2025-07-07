@@ -1,22 +1,26 @@
-// Import environment test first to ensure we log environment variables early
-// Removed for production
+/**
+ * main.tsx (Temporary Diagnostic Version)
+ * 
+ * This file has been temporarily modified to render ONLY the diagnostic component
+ * for testing the tldraw shape rendering in a completely isolated environment.
+ * 
+ * This will help determine if the malformed shape issue is caused by CSS conflicts
+ * from the main application's styles.
+ * 
+ * To restore the original application, revert the changes in this file.
+ */
+import { createRoot } from 'react-dom/client';
+import './styles/index.css';
+import App from './App';
+import { ConversationProvider } from './components/ConversationProvider';
+import React from 'react';
 
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './styles/index.css'
-// Import App and ConversationProvider
-import App from './App'
-import { ConversationProvider } from './components/ConversationProvider'
-import { logger } from './lib/utils/logging'
-
-// Initialize logger with appropriate level based on environment
-logger.setLevel(import.meta.env.DEV ? 'debug' : 'warn')
-
-// Main app rendering
+// Render only the diagnostic component.
+// Note: We are NOT importing `index.css` or `App.css` to ensure isolation.
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  <React.StrictMode>
     <ConversationProvider>
       <App />
     </ConversationProvider>
-  </StrictMode>,
-)
+  </React.StrictMode>,
+);
